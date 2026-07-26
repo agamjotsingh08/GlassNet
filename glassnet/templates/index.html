@@ -1,0 +1,117 @@
+<!doctype html>
+<!-- GlassNet has one page. JavaScript fills in the scan result after a scan finishes. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="GlassNet reveals the hidden digital ecosystem behind websites in plain English.">
+  <title>GlassNet — See what websites connect to</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" defer></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+  <!-- The top navigation stays visible while the user scrolls. -->
+  <header class="nav">
+    <a class="brand" href="#" aria-label="GlassNet home"><span class="brand-mark">G</span> GlassNet</a>
+    <nav aria-label="Main navigation">
+      <button class="nav-link" data-scroll="analyze">Analyze</button>
+      <button class="nav-link" data-scroll="history">History</button>
+      <button class="nav-link" data-scroll="learn">How it works</button>
+    </nav>
+    <span class="status"><i></i> Scanner ready</span>
+  </header>
+
+  <main>
+    <!-- This is the first section where someone enters a website address. -->
+    <section class="hero" id="analyze">
+      <div class="eyebrow">PRIVACY, MADE VISIBLE</div>
+      <h1>See who a website<br><em>talks to.</em></h1>
+      <p class="hero-copy">GlassNet reveals the hidden services behind any public website and explains what they do in plain English.</p>
+      <form id="scan-form" class="scan-box">
+        <label for="url-input">Website address</label>
+        <div class="input-row">
+          <span class="globe">◎</span>
+          <input id="url-input" name="url" placeholder="example.com" autocomplete="url" required>
+          <button type="submit" id="scan-button">Reveal connections <span>→</span></button>
+        </div>
+        <p class="form-note">Only public websites are scanned. A scan can take about 30 seconds.</p>
+      </form>
+      <div id="scan-message" class="message" role="status" aria-live="polite"></div>
+      <div class="trust-row">
+        <span>◉ Live browser observation</span><span>◈ Plain-English explanations</span><span>◇ Evidence-based scoring</span>
+      </div>
+    </section>
+
+    <section id="loading" class="loading hidden" aria-live="polite">
+      <div class="pulse"></div>
+      <h2>Looking through the glass…</h2>
+      <p id="loading-text">Opening the website in a private browser</p>
+    </section>
+
+    <!-- Results are hidden until Flask returns a completed scan. -->
+    <section id="results" class="results hidden">
+      <div class="section-heading">
+        <div><span class="kicker">SCAN RESULT</span><h2 id="result-name">Website</h2><a id="result-url" target="_blank" rel="noopener"></a></div>
+        <button id="new-scan" class="secondary">Scan another site</button>
+      </div>
+
+      <div class="score-grid">
+        <article class="score-card">
+          <div class="score-ring"><strong id="score-number">0</strong><span>/100</span></div>
+          <div><span class="muted">PRIVACY SCORE</span><h3 id="score-label">—</h3><p id="score-notice"></p></div>
+        </article>
+        <article class="metric"><span>Total requests</span><strong id="request-count">0</strong><small>Observed during load</small></article>
+        <article class="metric"><span>Outside services</span><strong id="third-party-count">0</strong><small>Different organizations</small></article>
+        <article class="metric"><span>Cookies</span><strong id="cookie-count">0</strong><small id="third-cookie-count">0 third-party</small></article>
+      </div>
+
+      <div class="panel-grid">
+        <article class="panel graph-panel">
+          <div class="panel-title"><div><span class="kicker">CONNECTION MAP</span><h3>The hidden ecosystem</h3></div><span class="hint">Click a node to explore</span></div>
+          <div id="network" aria-label="Interactive map of website connections"></div>
+        </article>
+        <aside class="panel detail-panel" id="service-detail">
+          <span class="kicker">SELECTED SERVICE</span>
+          <div class="empty-detail"><div class="big-icon">◎</div><h3>Choose a connection</h3><p>Click any service in the map to learn why the website contacted it.</p></div>
+        </aside>
+      </div>
+
+      <div class="panel-grid lower">
+        <article class="panel">
+          <div class="panel-title"><div><span class="kicker">WHAT WE FOUND</span><h3>Services by purpose</h3></div></div>
+          <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><div><span class="kicker">ALL CONNECTIONS</span><h3>Plain-English directory</h3></div></div>
+          <div id="service-list" class="service-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- History is loaded from the SQLite database by JavaScript. -->
+    <section id="history" class="history">
+      <div class="section-heading"><div><span class="kicker">YOUR RESEARCH</span><h2>Recent scans</h2></div><button id="compare-button" class="secondary" disabled>Compare selected</button></div>
+      <p class="section-copy">Select two results to compare their observable privacy exposure.</p>
+      <div id="history-list" class="history-list"><p class="empty">Your completed scans will appear here.</p></div>
+      <div id="comparison" class="comparison hidden"></div>
+    </section>
+
+    <!-- A simple explanation of what the project does. -->
+    <section id="learn" class="learn">
+      <span class="kicker">HOW IT WORKS</span><h2>An X-ray for the web.</h2>
+      <div class="steps">
+        <article><b>01</b><h3>Observe</h3><p>A real browser opens the public page and records the connections it makes.</p></article>
+        <article><b>02</b><h3>Translate</h3><p>Technical domains are matched to recognizable services and simple explanations.</p></article>
+        <article><b>03</b><h3>Explain</h3><p>GlassNet maps the ecosystem and estimates exposure without claiming a site is unsafe.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer><a class="brand" href="#"><span class="brand-mark">G</span> GlassNet</a><p>Privacy intelligence for everyone.</p><p>Results are observations, not legal or security advice.</p></footer>
+</body>
+</html>
