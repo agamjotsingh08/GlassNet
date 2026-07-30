@@ -1,0 +1,14 @@
+{
+  "status": "completed",
+  "scanner_version": "fixture",
+  "url": "https://demo.glassnet.local/",
+  "site_name": "GlassNet demo report",
+  "target_domain": "glassnet.local",
+  "score": 76,
+  "score_label": "Moderate exposure",
+  "notice": "Demo data only.",
+  "limitations": ["This is a sanitized fixture."],
+  "summary": {"requests": 9, "third_parties": 2, "cookies": 2, "third_party_cookies": 1, "storage_keys": 1, "scripts": 2},
+  "categories": {"Analytics": 1, "Content delivery": 1},
+  "services": [], "first_party": [], "cookies": [], "storage": [], "scripts": [], "graph": {"nodes": [], "edges": []}
+}

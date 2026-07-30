@@ -50,6 +50,12 @@ db.exec(`
     event_type TEXT NOT NULL, object_type TEXT NOT NULL, object_id TEXT, metadata_json TEXT,
     created_at TEXT NOT NULL
   ) STRICT;
+  CREATE TABLE IF NOT EXISTS user_feedback (
+    id INTEGER PRIMARY KEY, scan_id INTEGER REFERENCES scans(id) ON DELETE SET NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, kind TEXT NOT NULL,
+    rating INTEGER, details TEXT, ruleset_version TEXT NOT NULL, ui_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  ) STRICT;
   CREATE TABLE IF NOT EXISTS feature_flags (
     key TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, description TEXT NOT NULL
   ) STRICT;

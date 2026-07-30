@@ -3,7 +3,7 @@ import "dotenv/config";
 import express from "express";
 import fs from "node:fs";
 import { config } from "./src/config.js";
-import { addWatch, completeScan, createScan, failScan, featureFlags, findReport, jobStatus, listReports, listWatches, removeWatch, updateJob } from "./src/repository.js";
+import { addWatch, completeScan, createScan, failScan, featureFlags, findReport, jobStatus, listReports, listWatches, removeWatch, saveFeedback, updateJob } from "./src/repository.js";
 import { scanPublicWebsite } from "./src/scanner.js";
 import { safePublicUrl } from "./src/url-safety.js";
 import { register, signIn, signedInUser, signOut } from "./src/auth.js";
@@ -17,6 +17,13 @@ app.use(express.static(config.staticFolder));
 app.get("/", (_request, response) => response.type("html").send(fs.readFileSync(config.pageFile, "utf8")));
 app.get("/api/health", (_request, response) => response.json({ status: "ok", scanner_version: config.scannerVersion }));
 app.get("/api/features", (_request, response) => response.json(featureFlags()));
+app.post("/api/feedback", (request, response) => {
+  try {
+    const user = signedInUser(request.headers.cookie);
+    const id = saveFeedback({ scanId: Number(request.body?.scan_id) || undefined, userId: user?.id, kind: String(request.body?.kind || ""), rating: request.body?.rating ? Number(request.body.rating) : undefined, details: request.body?.details });
+    response.status(201).json({ id, message: "Thank you. Your feedback was saved locally." });
+  } catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "Feedback could not be saved." }); }
+});
 app.post("/api/auth/register", (request, response) => {
   try { response.status(201).json({ user: register(request.body?.email, request.body?.password) }); }
   catch (error) { response.status(400).json({ error: error instanceof Error ? error.message : "Registration failed." }); }

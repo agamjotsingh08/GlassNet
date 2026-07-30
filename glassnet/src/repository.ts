@@ -71,3 +71,13 @@ export function listWatches(userId: number) {
 export function removeWatch(userId: number, watchId: number) {
   return db.prepare("DELETE FROM watch_targets WHERE id=? AND user_id=?").run(watchId, userId).changes > 0;
 }
+
+export function saveFeedback(input: { scanId?: number; userId?: number; kind: string; rating?: number; details?: string }) {
+  const allowed = ["usefulness", "classification", "clarity", "missing_service", "graph", "false_positive", "incomplete"];
+  if (!allowed.includes(input.kind)) throw new Error("Choose a valid feedback type.");
+  if (input.rating && (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5)) throw new Error("Rating must be between 1 and 5.");
+  // Limit free text so feedback cannot become an accidental sensitive-data store.
+  const details = String(input.details || "").slice(0, 500) || null;
+  const result = db.prepare("INSERT INTO user_feedback (scan_id, user_id, kind, rating, details, ruleset_version, ui_version, created_at) VALUES (?, ?, ?, ?, ?, '0.2.0', '0.2.0', ?)").run(input.scanId || null, input.userId || null, input.kind, input.rating || null, details, now());
+  return Number(result.lastInsertRowid);
+}

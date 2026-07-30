@@ -6,6 +6,8 @@
     "start": "tsx server.ts",
     "dev": "tsx watch server.ts",
     "typecheck": "tsc --noEmit",
+    "build": "tsc --outDir dist",
+    "test": "npm run build && node --test dist/tests/classification.test.js",
     "install-browser": "playwright install chromium"
   },
   "dependencies": {

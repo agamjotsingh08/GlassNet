@@ -5,6 +5,7 @@ const loading = document.querySelector("#loading");
 const message = document.querySelector("#scan-message");
 const historyList = document.querySelector("#history-list");
 const compareButton = document.querySelector("#compare-button");
+const urlInput = document.querySelector("#url-input");
 let network;
 let chart;
 
@@ -18,10 +19,23 @@ document.querySelector("#new-scan").addEventListener("click", () => {
   document.querySelector("#url-input").focus();
 });
 
+// Keep an unfinished public URL in this browser only when the network drops.
+urlInput.value = localStorage.getItem("glassnet-unsent-url") || "";
+urlInput.addEventListener("input", () => localStorage.setItem("glassnet-unsent-url", urlInput.value));
+function showConnectionState() {
+  const state = document.querySelector("#connection-state");
+  state.classList.toggle("hidden", navigator.onLine);
+  state.textContent = navigator.onLine ? "" : "You are offline. Your website address is saved, but a scan cannot start until you reconnect.";
+}
+window.addEventListener("offline", showConnectionState);
+window.addEventListener("online", showConnectionState);
+showConnectionState();
+
 // Send the public website address to the GlassNet scan API.
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   message.textContent = "";
+  if (!navigator.onLine) { message.textContent = "You are offline. Reconnect before starting a scan."; return; }
   results.classList.add("hidden");
   loading.classList.remove("hidden");
   cycleLoadingMessages();
@@ -35,6 +49,7 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "The scan could not finish.");
     showResult(data);
+    localStorage.removeItem("glassnet-unsent-url");
     await loadHistory();
   } catch (error) {
     message.textContent = error.message;
@@ -196,3 +211,16 @@ function escapeHtml(value) {
 }
 
 loadHistory();
+
+// Feedback is a confirmed server action; the page waits for the API response.
+document.querySelector("#feedback-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedbackMessage = document.querySelector("#feedback-message");
+  try {
+    const response = await fetch("/api/feedback", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ kind: document.querySelector("#feedback-kind").value, rating: document.querySelector("#feedback-rating").value || undefined, details: document.querySelector("#feedback-details").value }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    feedbackMessage.textContent = data.message;
+    document.querySelector("#feedback-details").value = "";
+  } catch (error) { feedbackMessage.textContent = error.message; }
+});

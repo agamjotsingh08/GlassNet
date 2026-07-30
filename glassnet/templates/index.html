@@ -52,6 +52,7 @@
       <h2>Looking through the glass…</h2>
       <p id="loading-text">Opening the website in a private browser</p>
     </section>
+    <div id="connection-state" class="connection-state hidden" role="status" aria-live="polite"></div>
 
     <!-- Results are hidden until the scan API returns a completed report. -->
     <section id="results" class="results hidden">
@@ -109,6 +110,15 @@
         <article><b>02</b><h3>Translate</h3><p>Technical domains are matched to recognizable services and simple explanations.</p></article>
         <article><b>03</b><h3>Explain</h3><p>GlassNet maps the ecosystem and estimates exposure without claiming a site is unsafe.</p></article>
       </div>
+    </section>
+    <section class="feedback" aria-labelledby="feedback-title">
+      <span class="kicker">IMPROVE GLASSNET</span><h2 id="feedback-title">Was this scan useful?</h2>
+      <form id="feedback-form" class="feedback-form">
+        <label>Feedback type <select id="feedback-kind"><option value="usefulness">Scan usefulness</option><option value="classification">Service classification</option><option value="clarity">Explanation clarity</option><option value="missing_service">Missing service</option><option value="graph">Graph usability</option><option value="false_positive">Possible false positive</option><option value="incomplete">Incomplete result</option></select></label>
+        <label>Rating <select id="feedback-rating"><option value="">No rating</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+        <label>Optional note <input id="feedback-details" maxlength="500" placeholder="Do not include private information"></label>
+        <button type="submit" class="secondary">Send feedback</button><span id="feedback-message" aria-live="polite"></span>
+      </form>
     </section>
   </main>
 
