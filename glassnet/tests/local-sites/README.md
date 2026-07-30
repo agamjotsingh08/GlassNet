@@ -1,5 +1,5 @@
 # Local scan fixtures
 
-This folder is reserved for controlled test pages: cookies before/after consent,
-storage use, iframes, redirects, service workers, beacons, CSP variants, and
-timeout behavior. Do not load-test unrelated public websites.
+This folder is reserved for controlled test pages that exercise cookies,
+storage, redirects, security headers, and timeout behavior. Do not load-test
+unrelated public websites.

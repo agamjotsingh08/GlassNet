@@ -30,7 +30,6 @@ export async function scanPublicWebsite(
       source,
       destination,
       category,
-      consent_state: mode === "consent" ? "initial" : "not_tested",
     });
   };
 
@@ -90,7 +89,7 @@ export async function scanPublicWebsite(
       );
     }
 
-    const observationTime = mode === "quick" ? 900 : mode === "full" ? 2500 : 1800;
+    const observationTime = mode === "quick" ? 900 : 2500;
     await page.waitForTimeout(observationTime);
     title = (await page.title()).slice(0, 200) || targetDomain;
     onProgress?.({ stage: "reading_storage", domains: domains.size, requests: liveRequests });
@@ -192,13 +191,6 @@ export async function scanPublicWebsite(
     scripts,
     events,
     security_headers: securityHeaders,
-    consent: {
-      status: mode === "consent" ? "passive_observation" : "not_tested",
-      pre_consent_requests: mode === "consent" ? requestCount : 0,
-      note: mode === "consent"
-        ? "GlassNet recorded the initial state without clicking a consent control. Accept and reject automation is not claimed when a reliable control was not identified."
-        : "Run a Consent Investigation to record the page's initial consent state.",
-    },
     graph: { nodes, edges },
   };
 }

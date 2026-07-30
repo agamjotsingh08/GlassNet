@@ -10,6 +10,11 @@ const patterns = [
   ["GitHub token", /gh[pousr]_[A-Za-z0-9_]{30,}/],
   ["Google API key", /AIza[0-9A-Za-z_-]{30,}/],
   ["AWS access key", /AKIA[0-9A-Z]{16}/],
+  ["Stripe secret key", /sk_(live|test)_[0-9A-Za-z]{20,}/],
+  ["Slack token", /xox[baprs]-[0-9A-Za-z-]{10,}/],
+  ["bearer credential", /authorization\s*[:=]\s*["']Bearer\s+[A-Za-z0-9._~-]{16,}/i],
+  ["credential in URL", /https?:\/\/[^/\s:@]+:[^/\s@]+@/i],
+  ["hard-coded password", /password\s*[:=]\s*["'][^"' ]{8,}/i],
   ["assigned secret", /(api[_-]?key|access[_-]?token|client[_-]?secret|jwt[_-]?secret)\s*[:=]\s*["'][^"' ]{12,}/i],
 ];
 

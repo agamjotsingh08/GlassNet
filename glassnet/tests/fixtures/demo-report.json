@@ -110,7 +110,7 @@
     {
       "type": "localStorage",
       "origin": "https://observatory.example",
-      "key": "consent-choice"
+      "key": "display-preference"
     },
     {
       "type": "sessionStorage",
@@ -126,11 +126,6 @@
   "security_headers": {
     "strict-transport-security": "max-age=31536000",
     "x-content-type-options": "nosniff"
-  },
-  "consent": {
-    "status": "not_tested",
-    "pre_consent_requests": 0,
-    "note": "This sample does not claim that a consent control was activated."
   },
   "graph": {
     "nodes": [

@@ -1,83 +1,42 @@
-// GlassNet's local application server.
+// GlassNet's local server. It only exposes the routes needed to scan,
+// save, view, and compare public website reports.
 import "dotenv/config";
 import compression from "compression";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
+import { browserPoolStats, closeBrowserPool } from "./src/browser-pool.js";
 import { config } from "./src/config.js";
 import {
-  addPortfolioWebsite,
-  addWatch,
-  architectureComparison,
-  attributionForScan,
-  baselineForScan,
-  blueprintForScan,
   completeScan,
-  configurationDrift,
-  createApproval,
-  createConsentEvaluation,
-  createDebt,
-  createDecision,
-  createForecast,
-  createIssue,
-  createJourney,
-  createPortfolio,
-  createRequirement,
-  createReview,
   createScan,
-  evidenceChainForScan,
-  evaluateRequirements,
-  evaluateRules,
   failScan,
-  featureFlags,
   findReport,
-  incidentForScan,
   jobStatus,
-  listApprovals,
-  listConsentEvaluations,
-  listDebt,
-  listDecisions,
-  listForecasts,
-  listIssues,
-  listJourneys,
-  listPortfolios,
   listReportSummaries,
-  listRequirements,
-  listReviews,
-  listRules,
-  listWatches,
-  maturityModel,
-  necessityForScan,
-  removeWatch,
-  reportView,
-  saveFeedback,
-  saveServiceGovernance,
-  scenariosForScan,
-  serviceInventory,
-  setBaseline,
-  updateApproval,
-  updateDebt,
-  updateIssue,
   updateJob,
-  updateReview,
 } from "./src/repository.js";
 import { scanPublicWebsite } from "./src/scanner.js";
-import { browserPoolStats, closeBrowserPool } from "./src/browser-pool.js";
-import { safePublicUrl } from "./src/url-safety.js";
-import { register, signIn, signedInUser, signOut } from "./src/auth.js";
 import type { ScanMode } from "./src/types.js";
+import { safePublicUrl } from "./src/url-safety.js";
 
 const app = express();
-const liveJobs = new Map<number, { stage: string; domains: number; requests: number }>();
 const pageHtml = fs.readFileSync(config.pageFile, "utf8");
 const sampleFile = path.join(process.cwd(), "tests", "fixtures", "demo-report.json");
 const sampleReport = JSON.parse(fs.readFileSync(sampleFile, "utf8"));
+
+type QueuedScan = { scanId: number; website: string; mode: ScanMode };
+type LiveProgress = { stage: string; domains: number; requests: number };
+
+const scanQueue: QueuedScan[] = [];
+const liveJobs = new Map<number, LiveProgress>();
 const maxConcurrentScans = 2;
-const scanQueue: Array<{ scanId: number; website: string; mode: ScanMode }> = [];
 let activeScans = 0;
-const sendError = (response: express.Response, error: unknown, status = 400) => {
-  response.status(status).json({ error: error instanceof Error ? error.message : "The request could not be completed." });
-};
+
+function sendError(response: express.Response, error: unknown, status = 400) {
+  const message = error instanceof Error ? error.message : "The request could not be completed.";
+  response.status(status).json({ error: message });
+}
 
 app.disable("x-powered-by");
 app.use(compression({ threshold: 1024 }));
@@ -89,32 +48,39 @@ app.use("/api", (_request, response, next) => {
 app.use(express.static(config.staticFolder, { maxAge: "1y", immutable: true, etag: true }));
 
 function startQueuedScans() {
-  while (activeScans < maxConcurrentScans && scanQueue.length) {
-    const next = scanQueue.shift();
-    if (!next) return;
+  while (activeScans < maxConcurrentScans && scanQueue.length > 0) {
+    const nextScan = scanQueue.shift();
+    if (!nextScan) return;
+
     activeScans += 1;
-    void runScan(next).finally(() => {
+    void runScan(nextScan).finally(() => {
       activeScans = Math.max(0, activeScans - 1);
       startQueuedScans();
     });
   }
 }
 
-async function runScan(job: { scanId: number; website: string; mode: ScanMode }) {
+async function runScan(job: QueuedScan) {
   try {
     updateJob(job.scanId, "capturing", "opening_browser");
-    let lastProgressAt = 0;
+    let lastUpdate = 0;
     let lastStage = "";
+
     const report = await scanPublicWebsite(job.website, job.mode, (progress) => {
-      const time = Date.now();
-      if (progress.stage !== lastStage || time - lastProgressAt >= 350) {
+      const now = Date.now();
+      if (progress.stage !== lastStage || now - lastUpdate >= 350) {
         liveJobs.set(job.scanId, progress);
-        lastProgressAt = time;
         lastStage = progress.stage;
+        lastUpdate = now;
       }
     });
+
     completeScan(job.scanId, report);
-    liveJobs.set(job.scanId, { stage: "completed", domains: report.services.length + report.first_party.length, requests: report.summary.requests });
+    liveJobs.set(job.scanId, {
+      stage: "completed",
+      domains: report.services.length + report.first_party.length,
+      requests: report.summary.requests,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The scan could not finish.";
     failScan(job.scanId, message);
@@ -122,326 +88,125 @@ async function runScan(job: { scanId: number; website: string; mode: ScanMode })
   }
 }
 
-app.get("/api/health", (_request, response) => response.json({ status: "ok", scanner_version: config.scannerVersion }));
-app.get("/api/features", (_request, response) => response.json(featureFlags()));
-app.get("/api/sample-report", (_request, response) => {
-  response.json({
-    ...sampleReport,
-    mode: sampleReport.mode || "full",
-    events: sampleReport.events || sampleReport.services.flatMap((service: { domain: string; category: string }, index: number) => [
-      { sequence: index + 1, offset_ms: 280 + (index * 420), type: "response", source: sampleReport.target_domain, destination: service.domain, category: service.category, consent_state: "not_tested" },
-    ]),
-    security_headers: sampleReport.security_headers || { "strict-transport-security": "present", "x-content-type-options": "nosniff" },
-    consent: sampleReport.consent || { status: "not_tested", pre_consent_requests: 0, note: "Sample evidence does not include an automated consent action." },
-    is_sample: true,
-  });
+app.get("/api/health", (_request, response) => {
+  response.json({ status: "ok", scanner_version: config.scannerVersion });
 });
 
-app.post("/api/auth/register", (request, response) => {
-  try { response.status(201).json({ user: register(request.body?.email, request.body?.password) }); }
-  catch (error) { sendError(response, error); }
+app.get("/api/sample-report", (_request, response) => {
+  response.json({ ...sampleReport, is_sample: true });
 });
-app.post("/api/auth/login", (request, response) => {
-  try {
-    const login = signIn(request.body?.email, request.body?.password);
-    response.setHeader("Set-Cookie", `glassnet_session=${login.token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`);
-    response.json({ user: login.user });
-  } catch (error) { sendError(response, error, 401); }
-});
-app.post("/api/auth/logout", (request, response) => {
-  signOut(request.headers.cookie);
-  response.setHeader("Set-Cookie", "glassnet_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
-  response.status(204).end();
-});
-app.get("/api/auth/me", (request, response) => response.json({ user: signedInUser(request.headers.cookie) || null }));
 
 app.post("/api/scans", async (request, response) => {
   try {
     const website = await safePublicUrl(request.body?.url);
-    const allowedModes: ScanMode[] = ["quick", "full", "consent", "developer"];
-    const mode = allowedModes.includes(request.body?.mode) ? request.body.mode as ScanMode : "full";
-    const created = createScan(website, signedInUser(request.headers.cookie)?.id);
+    const mode: ScanMode = request.body?.mode === "quick" ? "quick" : "full";
+    const created = createScan(website);
+
     liveJobs.set(created.scanId, { stage: "queued", domains: 0, requests: 0 });
     scanQueue.push({ scanId: created.scanId, website, mode });
     startQueuedScans();
-    response.status(202).json({ ...created, status: "queued", mode, queue_position: Math.max(0, scanQueue.findIndex((item) => item.scanId === created.scanId)) });
-  } catch (error) { sendError(response, error); }
+
+    response.status(202).json({
+      ...created,
+      status: "queued",
+      mode,
+      queue_position: Math.max(0, scanQueue.findIndex((item) => item.scanId === created.scanId)),
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
 });
 
 app.get("/api/scans", (request, response) => {
   response.json(listReportSummaries(Number(request.query.limit) || 20, String(request.query.cursor || "")));
 });
+
 app.get("/api/scans/:id", (request, response) => {
   const report = findReport(Number(request.params.id));
   if (!report) return response.status(404).json({ error: "Scan not found." });
   response.json(report);
 });
-app.get("/api/scans/:id/view/:view", (request, response) => {
-  const allowed = ["summary", "map", "journeys", "evidence", "actions"] as const;
-  const view = allowed.find((item) => item === request.params.view);
-  if (!view) return response.status(400).json({ error: "Choose a valid report view." });
-  const report = reportView(Number(request.params.id), view);
-  if (!report) return response.status(404).json({ error: "Scan not found." });
-  response.json(report);
-});
+
 app.get("/api/jobs/:id", (request, response) => {
   const job = jobStatus(Number(request.params.id)) as Record<string, unknown> | undefined;
   if (!job) return response.status(404).json({ error: "Scan job not found." });
-  const progress = liveJobs.get(Number(job.scan_id));
-  response.json({ ...job, progress });
+  response.json({ ...job, progress: liveJobs.get(Number(job.scan_id)) });
 });
+
 app.get("/api/jobs/:id/events", (request, response) => {
   const jobId = Number(request.params.id);
   response.setHeader("Content-Type", "text/event-stream");
   response.setHeader("Cache-Control", "private, no-store");
   response.setHeader("Connection", "keep-alive");
   response.flushHeaders();
-  let lastPayload = "";
+  let previousPayload = "";
 
-  const send = () => {
+  const sendUpdate = () => {
     const job = jobStatus(jobId) as Record<string, unknown> | undefined;
     if (!job) {
       response.write(`event: error\ndata: ${JSON.stringify({ error: "Scan job not found." })}\n\n`);
       response.end();
       return true;
     }
-    const progress = liveJobs.get(Number(job.scan_id));
-    const payload = JSON.stringify({ ...job, progress });
-    if (payload !== lastPayload) {
+
+    const payload = JSON.stringify({ ...job, progress: liveJobs.get(Number(job.scan_id)) });
+    if (payload !== previousPayload) {
       response.write(`data: ${payload}\n\n`);
-      lastPayload = payload;
+      previousPayload = payload;
     }
+
     if (job.status === "completed" || job.status === "failed") {
-      response.write(`event: complete\ndata: ${JSON.stringify({ scan_id: job.scan_id, status: job.status, error_code: job.error_code })}\n\n`);
+      response.write(`event: complete\ndata: ${JSON.stringify({
+        scan_id: job.scan_id,
+        status: job.status,
+        error_code: job.error_code,
+      })}\n\n`);
       response.end();
       return true;
     }
     return false;
   };
 
-  if (send()) return;
+  if (sendUpdate()) return;
   const timer = setInterval(() => {
-    if (send()) clearInterval(timer);
+    if (sendUpdate()) clearInterval(timer);
   }, 400);
   request.on("close", () => clearInterval(timer));
+});
+
+app.get("/api/compare", (request, response) => {
+  const ids = String(request.query.id || "").split(",").map(Number).filter(Number.isFinite);
+  const reports = ids.map(findReport).filter(Boolean);
+  if (ids.length !== 2 || reports.length !== 2) {
+    return response.status(400).json({ error: "Choose exactly two completed scans." });
+  }
+  response.json(reports);
 });
 
 app.get("/api/performance", (_request, response) => {
   response.json({
     queue: { active: activeScans, waiting: scanQueue.length, concurrency: maxConcurrentScans },
     browser: browserPoolStats(),
-    server: { rss_bytes: process.memoryUsage().rss, uptime_seconds: Math.round(process.uptime()) },
   });
 });
 
-app.get("/api/compare", (request, response) => {
-  const ids = String(request.query.id || "").split(",").map(Number).filter(Number.isFinite);
-  const reports = ids.map((id) => findReport(id)).filter((report) => Boolean(report));
-  if (ids.length !== 2 || reports.length !== 2) return response.status(400).json({ error: "Choose exactly two scans to compare." });
-  response.json(reports);
+app.use("/api", (_request, response) => {
+  response.status(404).json({ error: "API route not found." });
 });
 
-app.post("/api/baselines", (request, response) => {
-  try { response.status(201).json({ id: setBaseline(Number(request.body?.scan_id), String(request.body?.label || "Production baseline")) }); }
-  catch (error) { sendError(response, error); }
-});
-app.get("/api/baselines/:scanId", (request, response) => response.json({ baseline: baselineForScan(Number(request.params.scanId)) || null }));
-app.get("/api/reviews", (_request, response) => response.json(listReviews()));
-app.post("/api/reviews", (request, response) => {
-  try { response.status(201).json(createReview(Number(request.body?.base_scan_id), Number(request.body?.candidate_scan_id))); }
-  catch (error) { sendError(response, error); }
-});
-app.patch("/api/reviews/:id", (request, response) => {
-  try { response.json(updateReview(Number(request.params.id), String(request.body?.status), String(request.body?.note || ""))); }
-  catch (error) { sendError(response, error); }
+app.get(/.*/, (_request, response) => {
+  response.setHeader("Cache-Control", "no-cache");
+  response.type("html").send(pageHtml);
 });
 
-app.get("/api/issues", (_request, response) => response.json(listIssues()));
-app.post("/api/issues", (request, response) => {
-  try {
-    const id = createIssue({
-      scanId: Number(request.body?.scan_id) || undefined,
-      title: String(request.body?.title || ""),
-      category: String(request.body?.category || "general"),
-      severity: String(request.body?.severity || "medium"),
-      evidence: String(request.body?.evidence || ""),
-    });
-    response.status(201).json({ id });
-  } catch (error) { sendError(response, error); }
+const server = app.listen(config.port, "0.0.0.0", () => {
+  console.log(`GlassNet is running at http://127.0.0.1:${config.port}`);
 });
-app.patch("/api/issues/:id", (request, response) => {
-  try { response.json(updateIssue(Number(request.params.id), String(request.body?.status))); }
-  catch (error) { sendError(response, error); }
-});
-
-app.get("/api/rules", (_request, response) => response.json(listRules()));
-app.get("/api/ci/:scanId", (request, response) => {
-  try { response.json(evaluateRules(Number(request.params.scanId))); }
-  catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/portfolios", (_request, response) => response.json(listPortfolios()));
-app.post("/api/portfolios", (request, response) => {
-  try { response.status(201).json({ id: createPortfolio(String(request.body?.name || ""), String(request.body?.description || "")) }); }
-  catch (error) { sendError(response, error); }
-});
-app.post("/api/portfolios/:id/websites", (request, response) => {
-  try { addPortfolioWebsite(Number(request.params.id), Number(request.body?.scan_id)); response.status(204).end(); }
-  catch (error) { sendError(response, error); }
-});
-
-app.get("/api/analysis/necessity/:scanId", (request, response) => {
-  try { response.json(necessityForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/attribution/:scanId", (request, response) => {
-  try { response.json(attributionForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/scenarios/:scanId", (request, response) => {
-  try { response.json(scenariosForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/blueprint/:scanId", (request, response) => {
-  try { response.json(blueprintForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/evidence-chain/:scanId", (request, response) => {
-  try { response.json(evidenceChainForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/drift/:scanId", (request, response) => {
-  try { response.json(configurationDrift(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/maturity/:scanId", (request, response) => {
-  try { response.json(maturityModel(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/incident/:scanId", (request, response) => {
-  try { response.json(incidentForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/analysis/architecture", (request, response) => {
-  try { response.json(architectureComparison(Number(request.query.left), Number(request.query.right))); } catch (error) { sendError(response, error, 404); }
-});
-
-app.get("/api/governance/inventory", (_request, response) => response.json(serviceInventory()));
-app.put("/api/governance/services/:domain", (request, response) => {
-  try {
-    response.json(saveServiceGovernance({
-      domain: request.params.domain, owner: request.body?.owner, team: request.body?.team,
-      purpose: request.body?.purpose, approvalStatus: request.body?.approval_status,
-      consentRequirement: request.body?.consent_requirement, reviewDate: request.body?.review_date,
-      notes: request.body?.notes,
-    }));
-  } catch (error) { sendError(response, error); }
-});
-app.get("/api/governance/approvals", (_request, response) => response.json(listApprovals()));
-app.post("/api/governance/approvals", (request, response) => {
-  try { response.status(201).json({ id: createApproval({
-    changeType: String(request.body?.change_type || "service"),
-    title: String(request.body?.title || ""), purpose: String(request.body?.purpose || ""),
-    owner: String(request.body?.owner || ""), expectedImpact: String(request.body?.expected_impact || ""),
-    consentRequirement: String(request.body?.consent_requirement || "review required"),
-    policyUpdateRequired: Boolean(request.body?.policy_update_required), evidence: request.body?.evidence,
-  }) }); } catch (error) { sendError(response, error); }
-});
-app.patch("/api/governance/approvals/:id", (request, response) => {
-  try { response.json(updateApproval(Number(request.params.id), String(request.body?.status))); } catch (error) { sendError(response, error); }
-});
-app.get("/api/governance/decisions", (_request, response) => response.json(listDecisions()));
-app.post("/api/governance/decisions", (request, response) => {
-  try { response.status(201).json({ id: createDecision({
-    title: String(request.body?.title || ""), context: String(request.body?.context || ""),
-    alternatives: String(request.body?.alternatives || ""), decision: String(request.body?.decision || ""),
-    privacyImpact: String(request.body?.privacy_impact || ""), consentImpact: request.body?.consent_impact,
-    performanceImpact: request.body?.performance_impact, owner: String(request.body?.owner || ""),
-    reviewDate: request.body?.review_date, relatedDomain: request.body?.related_domain,
-    relatedScanId: Number(request.body?.related_scan_id) || undefined, replacementPlan: request.body?.replacement_plan,
-  }) }); } catch (error) { sendError(response, error); }
-});
-
-app.get("/api/improvement/debt", (_request, response) => response.json(listDebt()));
-app.post("/api/improvement/debt", (request, response) => {
-  try { response.status(201).json({ id: createDebt({
-    scanId: Number(request.body?.scan_id) || undefined, domain: request.body?.domain,
-    title: String(request.body?.title || ""), category: String(request.body?.category || "documentation"),
-    impact: String(request.body?.impact || "moderate"), complexity: String(request.body?.complexity || "medium"),
-    effortHours: Number(request.body?.effort_hours) || 1, owner: request.body?.owner,
-    evidence: String(request.body?.evidence || ""),
-  }) }); } catch (error) { sendError(response, error); }
-});
-app.patch("/api/improvement/debt/:id", (request, response) => {
-  try { response.json(updateDebt(Number(request.params.id), String(request.body?.status))); } catch (error) { sendError(response, error); }
-});
-
-app.get("/api/testing/requirements", (_request, response) => response.json(listRequirements()));
-app.post("/api/testing/requirements", (request, response) => {
-  try { response.status(201).json({ id: createRequirement(String(request.body?.name || ""), String(request.body?.rule_type || ""), String(request.body?.expected_value || "0")) }); }
-  catch (error) { sendError(response, error); }
-});
-app.get("/api/testing/requirements/:scanId/run", (request, response) => {
-  try { response.json(evaluateRequirements(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
-});
-app.get("/api/testing/forecasts", (_request, response) => response.json(listForecasts()));
-app.post("/api/testing/forecasts", (request, response) => {
-  try { response.status(201).json(createForecast({
-    name: String(request.body?.name || ""), serviceCategory: String(request.body?.service_category || ""),
-    domains: String(request.body?.domains || ""), expectedScripts: Number(request.body?.expected_scripts) || 0,
-    cookieBehavior: String(request.body?.cookie_behavior || "unknown"), storageUse: String(request.body?.storage_use || "unknown"),
-    consentRequirement: String(request.body?.consent_requirement || "review"), pageLocations: request.body?.page_locations,
-    organization: request.body?.organization, dataPurpose: String(request.body?.data_purpose || ""),
-  })); } catch (error) { sendError(response, error); }
-});
-
-app.get("/api/journeys", (_request, response) => response.json(listJourneys()));
-app.post("/api/journeys", (request, response) => {
-  try { response.status(201).json({ id: createJourney(String(request.body?.name || ""), String(request.body?.start_url || ""), Array.isArray(request.body?.steps) ? request.body.steps.map(String) : []) }); }
-  catch (error) { sendError(response, error); }
-});
-app.get("/api/consent/evaluations", (_request, response) => response.json(listConsentEvaluations()));
-app.post("/api/consent/evaluations", (request, response) => {
-  try { response.status(201).json(createConsentEvaluation({
-    scanId: Number(request.body?.scan_id) || undefined,
-    acceptSteps: Number(request.body?.accept_steps), rejectSteps: Number(request.body?.reject_steps),
-    rejectVisible: Boolean(request.body?.reject_visible), granular: Boolean(request.body?.granular),
-    revisitAvailable: Boolean(request.body?.revisit_available), defaultSelections: Boolean(request.body?.default_selections),
-    evaluatorNote: request.body?.evaluator_note,
-  })); } catch (error) { sendError(response, error); }
-});
-
-app.get("/api/watch", (request, response) => {
-  const user = signedInUser(request.headers.cookie);
-  if (!user) return response.status(401).json({ error: "Sign in to manage watch targets." });
-  response.json(listWatches(user.id));
-});
-app.post("/api/watch", async (request, response) => {
-  const user = signedInUser(request.headers.cookie);
-  if (!user) return response.status(401).json({ error: "Sign in to manage watch targets." });
-  try { response.status(201).json({ website_id: addWatch(user.id, await safePublicUrl(request.body?.url), String(request.body?.cadence || "weekly")) }); }
-  catch (error) { sendError(response, error); }
-});
-app.delete("/api/watch/:id", (request, response) => {
-  const user = signedInUser(request.headers.cookie);
-  if (!user) return response.status(401).json({ error: "Sign in to manage watch targets." });
-  if (!removeWatch(user.id, Number(request.params.id))) return response.status(404).json({ error: "Watch target not found." });
-  response.status(204).end();
-});
-
-app.post("/api/feedback", (request, response) => {
-  try {
-    const user = signedInUser(request.headers.cookie);
-    const id = saveFeedback({
-      scanId: Number(request.body?.scan_id) || undefined,
-      userId: user?.id,
-      kind: String(request.body?.kind || ""),
-      rating: request.body?.rating ? Number(request.body.rating) : undefined,
-      details: request.body?.details,
-    });
-    response.status(201).json({ id, message: "Feedback saved locally." });
-  } catch (error) { sendError(response, error); }
-});
-
-app.use("/api", (_request, response) => response.status(404).json({ error: "API route not found." }));
-app.get(/.*/, (_request, response) => response.setHeader("Cache-Control", "no-cache").type("html").send(pageHtml));
-const server = app.listen(config.port, () => console.log(`GlassNet is running at http://127.0.0.1:${config.port}`));
 
 async function shutdown() {
   server.close();
   await closeBrowserPool();
 }
 
-process.once("SIGINT", () => void shutdown());
-process.once("SIGTERM", () => void shutdown());
+process.on("SIGINT", () => void shutdown());
+process.on("SIGTERM", () => void shutdown());

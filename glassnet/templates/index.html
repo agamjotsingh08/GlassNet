@@ -3,78 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="GlassNet reveals the live network trail, privacy behavior, and third-party dependencies behind public websites.">
+  <meta name="description" content="GlassNet shows the third-party services and privacy signals observed during a public website visit.">
   <meta name="theme-color" content="#171216">
-  <title>GlassNet — Obsidian Archive</title>
-  <link rel="stylesheet" href="/css/style.css?v=9">
-  <script src="/js/app.js?v=8" defer></script>
+  <title>GlassNet — Website Privacy Scanner</title>
+  <link rel="stylesheet" href="/css/style.css?v=10">
+  <script src="/js/app.js?v=10" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#workspace">Skip to workspace</a>
-  <div class="ambient" aria-hidden="true"></div>
+  <a class="skip-link" href="#main-content">Skip to content</a>
 
-  <div class="app-shell">
-    <aside class="rail" aria-label="Primary navigation">
-      <a class="brand" href="/home" data-link aria-label="GlassNet home">
-        <span class="brand-glyph">G</span><span class="brand-word">GlassNet</span>
-      </a>
-      <nav class="rail-nav">
-        <a href="/home" data-link data-nav="home"><span class="nav-glyph">⌂</span><span>Home</span></a>
-        <a href="/scan" data-link data-nav="scan"><span class="nav-glyph">◎</span><span>Scan</span></a>
-        <a href="/cases" data-link data-nav="cases"><span class="nav-glyph">▤</span><span>Cases</span></a>
-        <a href="/governance" data-link data-nav="governance"><span class="nav-glyph">§</span><span>Govern</span></a>
-        <a href="/improvement" data-link data-nav="improvement"><span class="nav-glyph">⌁</span><span>Improve</span></a>
-        <a href="/testing" data-link data-nav="testing"><span class="nav-glyph">✓</span><span>Test</span></a>
-      </nav>
-      <div class="rail-foot">
-        <button id="theme-button" class="icon-button" aria-label="Change color theme">◐</button>
-        <button id="help-button" class="icon-button" aria-label="Open keyboard shortcuts">?</button>
-      </div>
-    </aside>
+  <header class="site-header">
+    <a class="brand" href="/home" data-link aria-label="GlassNet home">
+      <span class="brand-mark">G</span>
+      <span><strong>GlassNet</strong><small>Privacy scanner</small></span>
+    </a>
 
-    <header class="workspace-header">
-      <div>
-        <p class="crumb" id="page-crumb">GlassNet / Home</p>
-        <h1 id="page-title">Obsidian Archive</h1>
-      </div>
-      <div class="header-actions">
-        <button class="command-trigger" id="command-trigger"><span>Search or run a command</span><kbd>Ctrl K</kbd></button>
-        <span class="scanner-state"><i>✓</i><span>Archive ready</span></span>
-        <button class="avatar" id="studio-button" aria-label="Open Studio workspace">ST</button>
-      </div>
-    </header>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="/home" data-link data-nav="home">Home</a>
+      <a href="/scan" data-link data-nav="scan">Scan</a>
+      <a href="/cases" data-link data-nav="cases">Reports</a>
+      <a href="/compare" data-link data-nav="compare">Compare</a>
+      <a href="/about" data-link data-nav="about">About</a>
+    </nav>
 
-    <main id="workspace" class="workspace" tabindex="-1"></main>
-    <aside id="inspector" class="inspector" aria-label="Context inspector"></aside>
-  </div>
+    <a class="button small primary" href="/scan" data-link>New scan</a>
+  </header>
 
-  <nav class="mobile-nav" aria-label="Mobile navigation">
-    <a href="/home" data-link data-nav="home">⌂<span>Home</span></a>
-    <a href="/scan" data-link data-nav="scan">◎<span>Scan</span></a>
-    <a href="/cases" data-link data-nav="cases">▤<span>Cases</span></a>
-    <a href="/governance" data-link data-nav="governance">§<span>Govern</span></a>
-    <a href="/studio" data-link>⌘<span>Studio</span></a>
-  </nav>
+  <main id="main-content" tabindex="-1"></main>
 
-  <dialog id="command-palette" class="command-palette">
-    <div class="command-head">
-      <span>⌕</span>
-      <input id="command-search" aria-label="Search commands" placeholder="Type a command or destination…">
-      <kbd>Esc</kbd>
-    </div>
-    <div id="command-list" class="command-list" role="listbox"></div>
-  </dialog>
+  <footer class="site-footer">
+    <span>GlassNet is an educational privacy-observation tool.</span>
+    <span>&copy; 2026 Agamjot Singh Babra. All rights reserved.</span>
+  </footer>
 
-  <dialog id="help-dialog" class="small-dialog">
-    <div class="dialog-body">
-      <p class="eyebrow">KEYBOARD</p>
-      <h2>Move quickly</h2>
-      <div class="shortcut-row"><span>Open command palette</span><kbd>Ctrl K</kbd></div>
-      <div class="shortcut-row"><span>Close panel</span><kbd>Esc</kbd></div>
-      <button class="button secondary" data-close-dialog>Done</button>
-    </div>
-  </dialog>
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

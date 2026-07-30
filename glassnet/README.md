@@ -1,103 +1,111 @@
 # GlassNet
 
-GlassNet is a local website privacy intelligence platform. Its **Obsidian
-Archive** interface captures a public website's observable network trail and
-organizes it as case evidence: domains, services, safe cookie attributes,
-storage-key names, scripts, selected security headers, graph relationships,
-and normalized replay events.
+GlassNet is a local website privacy scanner. It visits one public webpage in a
+fresh browser session, records safe technical metadata, and turns the observed
+network activity into a report that is easier to understand.
+
+The project is intentionally focused. It scans websites, identifies external
+services, displays the evidence, stores reports locally, and compares two
+reports. It is not a legal-compliance checker or a replacement for a full
+security audit.
+
+## Main features
+
+- Quick and full website scans
+- Public URL validation
+- First-party and third-party domain detection
+- Known-service classification
+- Privacy exposure score with a plain-language label
+- Safe cookie metadata, without cookie values
+- Storage-key names and external script URLs in full scans
+- Selected response security headers
+- Interactive website dependency map
+- Local scan history
+- Side-by-side report comparison
+- Responsive keyboard-friendly interface
+
+## Privacy boundaries
+
+GlassNet creates a fresh isolated browser context for every scan. It does not
+use a person's normal browser profile.
+
+GlassNet does not collect or save:
+
+- Passwords
+- Cookie values
+- Authentication tokens
+- Form contents
+- Request bodies
+- Response bodies
+- Personal browser sessions
+- Private or local network targets
+
+Completed reports are stored in `data/glassnet.sqlite`. The `data` directory is
+ignored by Git, so local scan history is not included when the repository is
+published.
+
+## Technology
+
+- Node.js
+- TypeScript
+- Express
+- Playwright
+- SQLite using Node's built-in SQLite module
+- tldts for registered-domain parsing
+- Cytoscape.js for the dependency map
 
 ## Run on Windows
 
-Open PowerShell inside the `glassnet` folder:
+Install Node.js 24 or newer. Then open PowerShell inside the `glassnet` folder.
+
+Install the project:
 
 ```powershell
 npm.cmd install
-npm.cmd run install-browser
-npm.cmd start
 ```
 
-Open `http://127.0.0.1:5000`.
+Install Playwright's browser:
 
-`npm.cmd` avoids the PowerShell execution-policy error that can affect
-`npm.ps1`. After the first installation, starting the app only requires:
+```powershell
+npm.cmd run install-browser
+```
+
+Start GlassNet:
 
 ```powershell
 npm.cmd start
 ```
 
-`npm.cmd start` runs the compiled production server. Use `npm.cmd run dev` only
-while actively editing TypeScript.
+Open:
 
-## Archive workspaces
+```text
+http://127.0.0.1:5000
+```
 
-- **Home** — recent cases, archive activity, and quick actions.
-- **Scan** — Quick, Full, Consent, and Developer investigations.
-- **Cases** — summary, dependency map, journeys, evidence, and actions.
-- **Govern** — service inventory, ownership, tag-manager records, approvals,
-  and architecture decision records.
-- **Improve** — necessity review, privacy blueprint, vendor substitution,
-  privacy debt, and maturity planning.
-- **Test** — requirements, configuration drift, impact forecasts, and
-  architecture comparison.
-- **Consent** — consent-interface quality records and evidence boundaries.
-- **Studio** — research exports, integrations, and local settings.
+After the first installation, you normally only need:
 
-The rebuild also includes feature-to-tracker attribution, data-exposure
-scenarios, evidence chains, incident reconstruction, journey mapping, and
-service governance. Calculated results distinguish observed evidence from
-classification, inference, recommendations, and user confirmation.
+```powershell
+npm.cmd start
+```
 
-## Storage
+Using `npm.cmd` avoids the PowerShell execution-policy error that can prevent
+`npm.ps1` from running.
 
-GlassNet uses Node's built-in SQLite support. The local database is
-`data/glassnet.sqlite`, which Git ignores. It stores scans and evidence
-separately from governance records, debt items, approvals, decisions,
-requirements, forecasts, journeys, and consent evaluations.
+## Development
 
-## Privacy and safety
+Start the TypeScript development server:
 
-Every scan uses a fresh isolated browser context. GlassNet does not open a
-person's normal browser profile or copy their login state. It does not retain
-cookie values, storage values, passwords, form contents, request bodies,
-authentication tokens, or response bodies. Private and local network targets
-are blocked.
+```powershell
+npm.cmd run dev
+```
 
-When the scanner did not observe enough evidence, the archive returns
-`inconclusive`; it does not invent a result.
+Build the project:
 
-## Main files
+```powershell
+npm.cmd run build
+```
 
-- `server.ts` — Express routes and scan orchestration.
-- `src/scanner.ts` — safe browser observation and normalized events.
-- `src/archive-analysis.ts` — small deterministic analysis helpers.
-- `src/repository.ts` — SQLite queries for cases and workflows.
-- `src/database.ts` — relational tables and local defaults.
-- `templates/index.html` — accessible application shell.
-- `static/css/style.css` — Obsidian Archive visual system.
-- `static/js/app.js` — routes, workspaces, graph, forms, and interactions.
-- `docs/OBSIDIAN_ARCHIVE.md` — rebuild audit and feature map.
-
-The measured performance baseline, results, budgets, and remaining limits are
-documented in `docs/PERFORMANCE.md`.
-
-## Performance
-
-GlassNet reuses the Playwright browser process while creating a fresh isolated
-context for every scan. Scan progress uses one cancellable event stream, case
-tabs request purpose-specific data, graph code loads only on the map route, and
-large evidence lists render in pages. Settings includes optional low-end-device
-and reduced-data modes.
-
-## Libraries
-
-- `express` — local web server and JSON API.
-- `playwright` — fresh isolated scanning browser.
-- `tldts` — registered-domain parsing.
-- `dotenv` — local environment settings.
-- `typescript` and `tsx` — TypeScript development runtime.
-- `cytoscape.js` — loaded only when a dependency map is opened.
-
-## Checks
+Run all checks:
 
 ```powershell
 npm.cmd run typecheck
@@ -105,5 +113,69 @@ npm.cmd test
 npm.cmd run check-secrets
 ```
 
-The exposure score and forecasts are transparent estimates based on available
-evidence. They are not legal, compliance, or security verdicts.
+The secret check looks through repository files for common credentials,
+private-key blocks, embedded passwords, and credential-bearing URLs. Keep real
+configuration values in a local `.env` file. `.env` is ignored by Git.
+
+## Project structure
+
+```text
+glassnet/
+├── server.ts                 Express server and scan queue
+├── src/
+│   ├── browser-pool.ts       Reuses the browser process safely
+│   ├── classification.ts     Recognizes known external services
+│   ├── config.ts             Reads local environment settings
+│   ├── database.ts           Creates the local SQLite tables
+│   ├── repository.ts         Saves and retrieves scan reports
+│   ├── scanner.ts            Observes a public webpage
+│   ├── types.ts              Shared TypeScript data shapes
+│   └── url-safety.ts         Blocks unsafe scan targets
+├── static/
+│   ├── css/style.css         Website design
+│   └── js/
+│       ├── app.js            Pages and interactions
+│       └── graph.js          Dependency-map module
+├── templates/index.html      Shared page shell and copyright footer
+├── tests/                    Automated checks and sanitized sample data
+└── scripts/secret-check.mjs  Repository secret scanner
+```
+
+## How a scan works
+
+1. The server validates that the submitted address is a public HTTP or HTTPS
+   URL.
+2. The scan waits in a small local queue.
+3. Playwright opens the page in a fresh isolated browser context.
+4. GlassNet records public network metadata, safe cookie attributes, and the
+   selected full-scan evidence.
+5. External domains are classified and the exposure score is calculated.
+6. The finished report is saved locally and displayed in the browser.
+
+## Understanding the score
+
+GlassNet starts at 100 and subtracts transparent weights for observed
+third-party services and cookie metadata. A lower score means that more
+privacy-relevant external activity was observed during that visit.
+
+The score is an educational estimate. Website behavior can change because of
+location, time, experiments, account state, or consent choices.
+
+## Current limitations
+
+- A scan observes one page load, not an entire website.
+- Some websites block automated browsers.
+- Domain classification cannot identify every external service.
+- The scan does not click consent banners or log into accounts.
+- Results can differ between visits.
+- The application is designed for local educational use, not high-volume
+  production scanning.
+
+## Responsible use
+
+Only scan public websites that you are permitted to access. Respect website
+terms, rate limits, and applicable laws.
+
+## Copyright
+
+Copyright © 2026 Agamjot Singh Babra. All rights reserved.

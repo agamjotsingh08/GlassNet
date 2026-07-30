@@ -9,7 +9,7 @@ export type CookieInfo = {
 };
 
 export type StorageInfo = { type: "localStorage" | "sessionStorage"; origin: string; key: string };
-export type ScanMode = "quick" | "full" | "consent" | "developer";
+export type ScanMode = "quick" | "full";
 
 export type ScanEvent = {
   sequence: number;
@@ -18,7 +18,6 @@ export type ScanEvent = {
   source: string;
   destination: string;
   category: string;
-  consent_state: "initial" | "not_tested";
 };
 
 export type Service = {
@@ -57,10 +56,5 @@ export type ScanResult = {
   scripts: string[];
   events: ScanEvent[];
   security_headers: Record<string, string>;
-  consent: {
-    status: "not_tested" | "passive_observation";
-    pre_consent_requests: number;
-    note: string;
-  };
   graph: { nodes: unknown[]; edges: unknown[] };
 };
