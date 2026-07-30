@@ -149,11 +149,12 @@ kbd { padding: 3px 6px; border: 1px solid var(--line-strong); border-bottom-widt
 .scan-command-top span { color: var(--plum); font: 20px monospace; }
 .scan-command input { flex: 1; min-width: 0; padding: 12px 0; border: 0; outline: 0; color: var(--text); background: transparent; font: 15px "Cascadia Code", monospace; }
 .mode-grid { padding: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.mode-option { display: block; cursor: pointer; }
+.mode-option { min-width: 0; display: block; cursor: pointer; }
 .mode-option input { position: absolute; opacity: 0; }
-.mode-tile { min-height: 115px; padding: 14px; border: 1px solid var(--line); background: var(--shell-2); transition: .15s ease; }
+.mode-tile { width: 100%; min-height: 115px; height: 100%; padding: 14px; display: flex; flex-direction: column; overflow-wrap: anywhere; border: 1px solid var(--line); background: var(--shell-2); transition: .15s ease; }
+.mode-tile > span { display: block; min-height: 22px; }
 .mode-tile strong { display: block; margin: 9px 0 5px; font-size: 13px; }
-.mode-tile small { color: var(--muted); line-height: 1.45; }
+.mode-tile small { display: block; color: var(--muted); line-height: 1.45; }
 .mode-option input:checked + .mode-tile { border-color: var(--copper); background: rgba(143, 77, 121, .18); box-shadow: inset 0 -2px var(--copper); }
 .scan-command-foot { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); }
 .quiet-note { color: var(--faint); font-size: 11px; }
