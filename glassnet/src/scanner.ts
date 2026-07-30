@@ -9,7 +9,18 @@ import type { CookieInfo, ScanResult, StorageInfo } from "./types.js";
 export async function scanPublicWebsite(website: string): Promise<ScanResult> {
   const targetDomain = mainDomain(new URL(website).hostname);
   const domains = new Map<string, { requests: number; types: Set<string> }>();
-  const browser = await chromium.launch({ headless: true });
+  // Some managed Windows computers block Playwright's bundled browser. In that
+  // case, use the locally installed Chrome browser without changing its profile.
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (firstError) {
+    try {
+      browser = await chromium.launch({ channel: "chrome", headless: true });
+    } catch {
+      throw new Error("GlassNet could not start an isolated browser. Windows or security software may be blocking browser automation on this computer.");
+    }
+  }
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, acceptDownloads: false });
   const page = await context.newPage();
   let title = targetDomain;
