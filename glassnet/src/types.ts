@@ -1,6 +1,4 @@
-// Shared data types. Keeping these in one file prevents the API, scanner, and
-// storage code from disagreeing about what a scan report looks like.
-
+// Shared shapes keep the scanner, API, database, and browser interface aligned.
 export type CookieInfo = {
   domain: string;
   secure: boolean;
@@ -11,6 +9,17 @@ export type CookieInfo = {
 };
 
 export type StorageInfo = { type: "localStorage" | "sessionStorage"; origin: string; key: string };
+export type ScanMode = "quick" | "full" | "consent" | "developer";
+
+export type ScanEvent = {
+  sequence: number;
+  offset_ms: number;
+  type: "navigation" | "response" | "cookie" | "storage" | "script" | "complete";
+  source: string;
+  destination: string;
+  category: string;
+  consent_state: "initial" | "not_tested";
+};
 
 export type Service = {
   domain: string;
@@ -30,6 +39,7 @@ export type ScanResult = {
   id?: number;
   created_at?: string;
   status: ScanStatus;
+  mode: ScanMode;
   scanner_version: string;
   url: string;
   site_name: string;
@@ -45,5 +55,12 @@ export type ScanResult = {
   cookies: CookieInfo[];
   storage: StorageInfo[];
   scripts: string[];
+  events: ScanEvent[];
+  security_headers: Record<string, string>;
+  consent: {
+    status: "not_tested" | "passive_observation";
+    pre_consent_requests: number;
+    note: string;
+  };
   graph: { nodes: unknown[]; edges: unknown[] };
 };

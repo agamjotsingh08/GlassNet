@@ -1,14 +1,150 @@
 {
   "status": "completed",
-  "scanner_version": "fixture",
-  "url": "https://demo.glassnet.local/",
-  "site_name": "GlassNet demo report",
-  "target_domain": "glassnet.local",
+  "mode": "full",
+  "scanner_version": "0.3.0-demo",
+  "url": "https://observatory.example/",
+  "site_name": "Observatory Example",
+  "target_domain": "observatory.example",
   "score": 76,
   "score_label": "Moderate exposure",
-  "notice": "Demo data only.",
-  "limitations": ["This is a sanitized fixture."],
-  "summary": {"requests": 9, "third_parties": 2, "cookies": 2, "third_party_cookies": 1, "storage_keys": 1, "scripts": 2},
-  "categories": {"Analytics": 1, "Content delivery": 1},
-  "services": [], "first_party": [], "cookies": [], "storage": [], "scripts": [], "graph": {"nodes": [], "edges": []}
+  "notice": "Sanitized demonstration evidence.",
+  "limitations": [
+    "This is a sanitized fixture.",
+    "It represents one public page load.",
+    "Cookie and storage values are not included."
+  ],
+  "summary": {
+    "requests": 19,
+    "third_parties": 4,
+    "cookies": 3,
+    "third_party_cookies": 1,
+    "storage_keys": 2,
+    "scripts": 3
+  },
+  "categories": {
+    "Analytics": 1,
+    "Content delivery": 1,
+    "Customer support": 1,
+    "Advertising": 1
+  },
+  "services": [
+    {
+      "domain": "metrics.example",
+      "name": "Northstar Metrics",
+      "category": "Analytics",
+      "explanation": "Measures page usage and navigation patterns.",
+      "essential": false,
+      "confidence": "likely",
+      "weight": 8,
+      "requests": 5,
+      "types": ["script", "fetch"]
+    },
+    {
+      "domain": "assets.example",
+      "name": "Atlas CDN",
+      "category": "Content delivery",
+      "explanation": "Delivers scripts, fonts, and images.",
+      "essential": true,
+      "confidence": "verified",
+      "weight": 2,
+      "requests": 7,
+      "types": ["script", "image", "font"]
+    },
+    {
+      "domain": "help.example",
+      "name": "Beacon Support",
+      "category": "Customer support",
+      "explanation": "Loads a customer-support widget.",
+      "essential": false,
+      "confidence": "likely",
+      "weight": 5,
+      "requests": 3,
+      "types": ["script", "xhr"]
+    },
+    {
+      "domain": "ads.unknown.example",
+      "name": "ads.unknown.example",
+      "category": "Advertising",
+      "explanation": "The domain matched an advertising pattern but ownership is unresolved.",
+      "essential": false,
+      "confidence": "unknown",
+      "weight": 10,
+      "requests": 2,
+      "types": ["script", "image"]
+    }
+  ],
+  "first_party": [
+    {
+      "domain": "observatory.example",
+      "requests": 2,
+      "types": ["document", "stylesheet"]
+    }
+  ],
+  "cookies": [
+    {
+      "domain": "observatory.example",
+      "secure": true,
+      "httpOnly": true,
+      "sameSite": "Lax",
+      "session": true,
+      "firstParty": true
+    },
+    {
+      "domain": "metrics.example",
+      "secure": true,
+      "httpOnly": false,
+      "sameSite": "None",
+      "session": false,
+      "firstParty": false
+    },
+    {
+      "domain": "observatory.example",
+      "secure": false,
+      "httpOnly": false,
+      "sameSite": "Lax",
+      "session": false,
+      "firstParty": true
+    }
+  ],
+  "storage": [
+    {
+      "type": "localStorage",
+      "origin": "https://observatory.example",
+      "key": "consent-choice"
+    },
+    {
+      "type": "sessionStorage",
+      "origin": "https://observatory.example",
+      "key": "page-session"
+    }
+  ],
+  "scripts": [
+    "https://assets.example/app.js",
+    "https://metrics.example/measure.js",
+    "https://help.example/widget.js"
+  ],
+  "security_headers": {
+    "strict-transport-security": "max-age=31536000",
+    "x-content-type-options": "nosniff"
+  },
+  "consent": {
+    "status": "not_tested",
+    "pre_consent_requests": 0,
+    "note": "This sample does not claim that a consent control was activated."
+  },
+  "graph": {
+    "nodes": [
+      {"data": {"id": "observatory.example", "label": "observatory.example", "kind": "website"}},
+      {"data": {"id": "metrics.example", "label": "Northstar Metrics", "kind": "Analytics", "details": {"domain": "metrics.example", "name": "Northstar Metrics", "category": "Analytics", "explanation": "Measures page usage and navigation patterns.", "essential": false, "confidence": "likely", "weight": 8, "requests": 5, "types": ["script", "fetch"]}}},
+      {"data": {"id": "assets.example", "label": "Atlas CDN", "kind": "Content delivery", "details": {"domain": "assets.example", "name": "Atlas CDN", "category": "Content delivery", "explanation": "Delivers scripts, fonts, and images.", "essential": true, "confidence": "verified", "weight": 2, "requests": 7, "types": ["script", "image", "font"]}}},
+      {"data": {"id": "help.example", "label": "Beacon Support", "kind": "Customer support", "details": {"domain": "help.example", "name": "Beacon Support", "category": "Customer support", "explanation": "Loads a customer-support widget.", "essential": false, "confidence": "likely", "weight": 5, "requests": 3, "types": ["script", "xhr"]}}},
+      {"data": {"id": "ads.unknown.example", "label": "Unknown Ads", "kind": "Advertising", "details": {"domain": "ads.unknown.example", "name": "ads.unknown.example", "category": "Advertising", "explanation": "Ownership is unresolved.", "essential": false, "confidence": "unknown", "weight": 10, "requests": 2, "types": ["script", "image"]}}}
+    ],
+    "edges": [
+      {"data": {"source": "observatory.example", "target": "metrics.example"}},
+      {"data": {"source": "observatory.example", "target": "assets.example"}},
+      {"data": {"source": "observatory.example", "target": "help.example"}},
+      {"data": {"source": "observatory.example", "target": "ads.unknown.example"}}
+    ]
+  }
 }

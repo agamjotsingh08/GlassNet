@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --outDir dist",
     "test": "npm run build && node --test dist/tests/classification.test.js",
+    "check-secrets": "node scripts/secret-check.mjs",
     "install-browser": "playwright install chromium"
   },
   "dependencies": {

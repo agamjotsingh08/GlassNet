@@ -59,10 +59,49 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS feature_flags (
     key TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, description TEXT NOT NULL
   ) STRICT;
+  CREATE TABLE IF NOT EXISTS privacy_baselines (
+    id INTEGER PRIMARY KEY, website_id INTEGER NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+    scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE, label TEXT NOT NULL,
+    created_at TEXT NOT NULL, UNIQUE(website_id)
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS privacy_reviews (
+    id INTEGER PRIMARY KEY, base_scan_id INTEGER NOT NULL REFERENCES scans(id),
+    candidate_scan_id INTEGER NOT NULL REFERENCES scans(id), status TEXT NOT NULL,
+    summary_json TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS issues (
+    id INTEGER PRIMARY KEY, scan_id INTEGER REFERENCES scans(id) ON DELETE SET NULL,
+    title TEXT NOT NULL, category TEXT NOT NULL, severity TEXT NOT NULL, evidence TEXT NOT NULL,
+    status TEXT NOT NULL, assignee TEXT, due_date TEXT, resolution TEXT, created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS issue_comments (
+    id INTEGER PRIMARY KEY, issue_id INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    author TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS portfolios (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS portfolio_websites (
+    portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+    website_id INTEGER NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL, PRIMARY KEY(portfolio_id, website_id)
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS threshold_rules (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, rule_type TEXT NOT NULL, operator TEXT NOT NULL,
+    value INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+  ) STRICT;
+  CREATE TABLE IF NOT EXISTS public_passports (
+    id INTEGER PRIMARY KEY, website_id INTEGER NOT NULL REFERENCES websites(id) ON DELETE CASCADE,
+    public_slug TEXT NOT NULL UNIQUE, published INTEGER NOT NULL DEFAULT 0,
+    owner_note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  ) STRICT;
   CREATE INDEX IF NOT EXISTS scans_website_created ON scans(website_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS scans_user_created ON scans(user_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS scan_jobs_status ON scan_jobs(status, updated_at);
   CREATE INDEX IF NOT EXISTS watch_next_check ON watch_targets(next_check_at);
+  CREATE INDEX IF NOT EXISTS issues_status ON issues(status, updated_at DESC);
+  CREATE INDEX IF NOT EXISTS reviews_candidate ON privacy_reviews(candidate_scan_id);
 `);
 
 const defaults = [
@@ -74,3 +113,13 @@ const defaults = [
 ];
 const insertFlag = db.prepare("INSERT OR IGNORE INTO feature_flags (key, enabled, description) VALUES (?, 0, ?)");
 for (const [key, description] of defaults) insertFlag.run(key, description);
+
+const starterRules = [
+  ["No unknown domains", "unknown_domains", "max", 0],
+  ["Third-party budget", "third_parties", "max", 12],
+  ["Cookie budget", "cookies", "max", 20],
+];
+const insertRule = db.prepare("INSERT INTO threshold_rules (name, rule_type, operator, value, created_at) SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM threshold_rules WHERE name=?)");
+for (const [name, type, operator, value] of starterRules) {
+  insertRule.run(name, type, operator, value, new Date().toISOString(), name);
+}

@@ -81,3 +81,116 @@ export function saveFeedback(input: { scanId?: number; userId?: number; kind: st
   const result = db.prepare("INSERT INTO user_feedback (scan_id, user_id, kind, rating, details, ruleset_version, ui_version, created_at) VALUES (?, ?, ?, ?, ?, '0.2.0', '0.2.0', ?)").run(input.scanId || null, input.userId || null, input.kind, input.rating || null, details, now());
   return Number(result.lastInsertRowid);
 }
+
+export function compareReports(baseId: number, candidateId: number) {
+  const base = findReport(baseId);
+  const candidate = findReport(candidateId);
+  if (!base || !candidate) throw new Error("Both completed scans are required.");
+  const baseDomains = new Set(base.services.map((item) => item.domain));
+  const candidateDomains = new Set(candidate.services.map((item) => item.domain));
+  const added = candidate.services.filter((item) => !baseDomains.has(item.domain));
+  const removed = base.services.filter((item) => !candidateDomains.has(item.domain));
+  const changed = [
+    candidate.summary.cookies !== base.summary.cookies ? `Cookie count changed from ${base.summary.cookies} to ${candidate.summary.cookies}` : "",
+    candidate.summary.third_parties !== base.summary.third_parties ? `Third parties changed from ${base.summary.third_parties} to ${candidate.summary.third_parties}` : "",
+    candidate.score !== base.score ? `Exposure score changed from ${base.score} to ${candidate.score}` : "",
+  ].filter(Boolean);
+  return {
+    base: { id: base.id, site_name: base.site_name, created_at: base.created_at, score: base.score },
+    candidate: { id: candidate.id, site_name: candidate.site_name, created_at: candidate.created_at, score: candidate.score },
+    added,
+    removed,
+    changed,
+    verdict: added.some((item) => item.category === "Advertising") || candidate.score < base.score - 10 ? "fail" : added.length ? "warning" : "pass",
+  };
+}
+
+export function setBaseline(scanId: number, label = "Production baseline") {
+  const row = db.prepare("SELECT website_id FROM scans WHERE id=? AND status='completed'").get(scanId) as Row | undefined;
+  if (!row) throw new Error("Choose a completed scan.");
+  const result = db.prepare("INSERT INTO privacy_baselines (website_id, scan_id, label, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(website_id) DO UPDATE SET scan_id=excluded.scan_id, label=excluded.label, created_at=excluded.created_at").run(Number(row.website_id), scanId, label.slice(0, 80), now());
+  return Number(result.lastInsertRowid || scanId);
+}
+
+export function baselineForScan(scanId: number) {
+  return db.prepare("SELECT privacy_baselines.id, privacy_baselines.scan_id, privacy_baselines.label, privacy_baselines.created_at FROM privacy_baselines JOIN scans ON scans.website_id=privacy_baselines.website_id WHERE scans.id=?").get(scanId);
+}
+
+export function createReview(baseScanId: number, candidateScanId: number) {
+  const summary = compareReports(baseScanId, candidateScanId);
+  const time = now();
+  const result = db.prepare("INSERT INTO privacy_reviews (base_scan_id, candidate_scan_id, status, summary_json, created_at, updated_at) VALUES (?, ?, 'open', ?, ?, ?)").run(baseScanId, candidateScanId, JSON.stringify(summary), time, time);
+  return { id: Number(result.lastInsertRowid), status: "open", ...summary };
+}
+
+export function listReviews() {
+  return (db.prepare("SELECT id, status, summary_json, note, created_at, updated_at FROM privacy_reviews ORDER BY created_at DESC LIMIT 30").all() as Row[]).map((row) => ({ ...row, summary: JSON.parse(String(row.summary_json)) }));
+}
+
+export function updateReview(id: number, status: string, note = "") {
+  const allowed = ["open", "approved", "changes_requested", "expected", "false_positive"];
+  if (!allowed.includes(status)) throw new Error("Choose a valid review status.");
+  const changed = db.prepare("UPDATE privacy_reviews SET status=?, note=?, updated_at=? WHERE id=?").run(status, note.slice(0, 500), now(), id).changes;
+  if (!changed) throw new Error("Review not found.");
+  return db.prepare("SELECT id, status, note, updated_at FROM privacy_reviews WHERE id=?").get(id);
+}
+
+export function listIssues() {
+  return db.prepare("SELECT id, scan_id, title, category, severity, evidence, status, assignee, due_date, resolution, created_at, updated_at FROM issues ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, updated_at DESC").all();
+}
+
+export function createIssue(input: { scanId?: number; title: string; category: string; severity: string; evidence: string }) {
+  const allowed = ["low", "medium", "high", "critical"];
+  if (!allowed.includes(input.severity)) throw new Error("Choose a valid severity.");
+  if (!input.title.trim() || !input.evidence.trim()) throw new Error("Title and evidence are required.");
+  const time = now();
+  const result = db.prepare("INSERT INTO issues (scan_id, title, category, severity, evidence, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?)").run(input.scanId || null, input.title.slice(0, 120), input.category.slice(0, 60), input.severity, input.evidence.slice(0, 1000), time, time);
+  return Number(result.lastInsertRowid);
+}
+
+export function updateIssue(id: number, status: string) {
+  const allowed = ["open", "triaged", "in_progress", "resolved", "accepted", "false_positive", "reopened"];
+  if (!allowed.includes(status)) throw new Error("Choose a valid issue status.");
+  if (!db.prepare("UPDATE issues SET status=?, updated_at=? WHERE id=?").run(status, now(), id).changes) throw new Error("Issue not found.");
+  return db.prepare("SELECT * FROM issues WHERE id=?").get(id);
+}
+
+export function listRules() {
+  return db.prepare("SELECT id, name, rule_type, operator, value, enabled FROM threshold_rules ORDER BY id").all();
+}
+
+export function evaluateRules(scanId: number) {
+  const report = findReport(scanId);
+  if (!report) throw new Error("Completed scan not found.");
+  const values: Record<string, number> = {
+    third_parties: report.summary.third_parties,
+    cookies: report.summary.cookies,
+    unknown_domains: report.services.filter((item) => item.confidence === "unknown").length,
+  };
+  const checks = (listRules() as Row[]).filter((rule) => Number(rule.enabled) === 1).map((rule) => {
+    const actual = values[String(rule.rule_type)] ?? 0;
+    const passed = actual <= Number(rule.value);
+    return { id: rule.id, name: rule.name, actual, limit: Number(rule.value), status: passed ? "pass" : "fail" };
+  });
+  return { scan_id: scanId, status: checks.some((item) => item.status === "fail") ? "fail" : "pass", checks };
+}
+
+export function listPortfolios() {
+  const rows = db.prepare("SELECT id, name, description, created_at FROM portfolios ORDER BY created_at DESC").all() as Row[];
+  return rows.map((portfolio) => ({
+    ...portfolio,
+    websites: db.prepare("SELECT websites.id, websites.hostname, websites.title, MAX(scans.created_at) AS last_scan, MAX(scans.request_count) AS requests, MAX(scans.cookie_count) AS cookies FROM portfolio_websites JOIN websites ON websites.id=portfolio_websites.website_id LEFT JOIN scans ON scans.website_id=websites.id AND scans.status='completed' WHERE portfolio_websites.portfolio_id=? GROUP BY websites.id ORDER BY websites.hostname").all(Number(portfolio.id)),
+  }));
+}
+
+export function createPortfolio(name: string, description = "") {
+  if (!name.trim()) throw new Error("Portfolio name is required.");
+  const result = db.prepare("INSERT INTO portfolios (name, description, created_at) VALUES (?, ?, ?)").run(name.slice(0, 80), description.slice(0, 300), now());
+  return Number(result.lastInsertRowid);
+}
+
+export function addPortfolioWebsite(portfolioId: number, scanId: number) {
+  const row = db.prepare("SELECT website_id FROM scans WHERE id=? AND status='completed'").get(scanId) as Row | undefined;
+  if (!row) throw new Error("Choose a completed scan.");
+  db.prepare("INSERT OR IGNORE INTO portfolio_websites (portfolio_id, website_id, created_at) VALUES (?, ?, ?)").run(portfolioId, Number(row.website_id), now());
+}
