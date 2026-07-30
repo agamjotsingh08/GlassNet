@@ -18,7 +18,7 @@ document.querySelector("#new-scan").addEventListener("click", () => {
   document.querySelector("#url-input").focus();
 });
 
-// Send the website address to Flask when the visitor clicks Reveal.
+// Send the public website address to the GlassNet scan API.
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   message.textContent = "";

@@ -1,8 +1,9 @@
-__pycache__/
-*.py[cod]
+node_modules/
 .venv/
-.env
+__pycache__/
 instance/
+.env
+glassnet-browser-profile/
+data/scans.json
 playwright-report/
 .DS_Store
-
