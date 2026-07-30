@@ -2,6 +2,7 @@
 import "dotenv/config";
 import express from "express";
 import fs from "node:fs";
+import path from "node:path";
 import { config } from "./src/config.js";
 import { addWatch, completeScan, createScan, failScan, featureFlags, findReport, jobStatus, listReports, listWatches, removeWatch, saveFeedback, updateJob } from "./src/repository.js";
 import { scanPublicWebsite } from "./src/scanner.js";
@@ -17,6 +18,10 @@ app.use(express.static(config.staticFolder));
 app.get("/", (_request, response) => response.type("html").send(fs.readFileSync(config.pageFile, "utf8")));
 app.get("/api/health", (_request, response) => response.json({ status: "ok", scanner_version: config.scannerVersion }));
 app.get("/api/features", (_request, response) => response.json(featureFlags()));
+app.get("/api/sample-report", (_request, response) => {
+  const file = path.join(process.cwd(), "tests", "fixtures", "demo-report.json");
+  response.json({ ...JSON.parse(fs.readFileSync(file, "utf8")), is_sample: true });
+});
 app.post("/api/feedback", (request, response) => {
   try {
     const user = signedInUser(request.headers.cookie);

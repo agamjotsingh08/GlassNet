@@ -8,6 +8,17 @@ const compareButton = document.querySelector("#compare-button");
 const urlInput = document.querySelector("#url-input");
 let network;
 let chart;
+let latestScanId = null;
+
+function setTheme(value) { document.documentElement.dataset.theme = value; localStorage.setItem("glassnet-theme", value); }
+function setDensity(value) { document.documentElement.dataset.density = value; localStorage.setItem("glassnet-density", value); }
+setTheme(localStorage.getItem("glassnet-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+setDensity(localStorage.getItem("glassnet-density") || "comfortable");
+document.querySelector("#theme-toggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+document.querySelector("#density-toggle").addEventListener("click", () => setDensity(document.documentElement.dataset.density === "compact" ? "comfortable" : "compact"));
+const onboarding = document.querySelector("#onboarding");
+if (!localStorage.getItem("glassnet-onboarding-seen")) onboarding.showModal();
+document.querySelector("#onboarding-close").addEventListener("click", () => { localStorage.setItem("glassnet-onboarding-seen", "yes"); onboarding.close(); });
 
 // Small navigation buttons scroll to their matching section.
 document.querySelectorAll("[data-scroll]").forEach((button) => {
@@ -49,6 +60,7 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "The scan could not finish.");
     showResult(data);
+    latestScanId = data.id || null;
     localStorage.removeItem("glassnet-unsent-url");
     await loadHistory();
   } catch (error) {
@@ -93,7 +105,21 @@ function showResult(data) {
   renderGraph(data.graph);
   renderChart(data.categories);
   renderServiceList(data.services);
+  renderGraphText(data);
   results.scrollIntoView();
+}
+
+async function showSample() {
+  const response = await fetch("/api/sample-report");
+  const data = await response.json();
+  message.textContent = "Showing sanitized sample data — not a live scan.";
+  showResult(data);
+}
+document.querySelector("#sample-button").addEventListener("click", showSample);
+
+function renderGraphText(data) {
+  const text = data.services.length ? data.services.map((item) => `<li>${escapeHtml(data.target_domain)} contacted ${escapeHtml(item.name)} (${escapeHtml(item.category)}), ${item.requests} requests.</li>`).join("") : "<li>No outside services were observed in this report.</li>";
+  document.querySelector("#graph-text-list").innerHTML = `<p>This report shows ${data.summary.third_parties} outside services.</p><ul>${text}</ul>`;
 }
 
 // Cytoscape.js draws the connection map from nodes and connecting lines.

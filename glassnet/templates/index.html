@@ -24,6 +24,8 @@
       <button class="nav-link" data-scroll="learn">How it works</button>
     </nav>
     <span class="status"><i></i> Scanner ready</span>
+    <button id="theme-toggle" class="utility" aria-label="Change color theme">Theme</button>
+    <button id="density-toggle" class="utility" aria-label="Change information density">Compact</button>
   </header>
 
   <main>
@@ -45,6 +47,7 @@
       <div class="trust-row">
         <span>◉ Live browser observation</span><span>◈ Plain-English explanations</span><span>◇ Evidence-based scoring</span>
       </div>
+      <button id="sample-button" class="sample-button" type="button">Explore a sample report</button>
     </section>
 
     <section id="loading" class="loading hidden" aria-live="polite">
@@ -75,6 +78,7 @@
         <article class="panel graph-panel">
           <div class="panel-title"><div><span class="kicker">CONNECTION MAP</span><h3>The hidden ecosystem</h3></div><span class="hint">Click a node to explore</span></div>
           <div id="network" aria-label="Interactive map of website connections"></div>
+          <details class="graph-text"><summary>Read this graph as text</summary><div id="graph-text-list"></div></details>
         </article>
         <aside class="panel detail-panel" id="service-detail">
           <span class="kicker">SELECTED SERVICE</span>
@@ -121,6 +125,8 @@
       </form>
     </section>
   </main>
+
+  <dialog id="onboarding" class="onboarding"><div class="onboarding-box"><span class="kicker">WELCOME TO GLASSNET</span><h2>What you will see</h2><ol><li>Public website connections and safe metadata.</li><li>Not passwords, cookie values, personal sessions, or form content.</li><li>Third parties are outside services contacted by a site.</li><li>Consent comparisons are shown only when a scan supports them.</li><li>Confidence explains how strongly a service was matched.</li><li>Results can differ by time, region, and consent choice.</li></ol><button id="onboarding-close" class="secondary">Start exploring</button></div></dialog>
 
   <footer><a class="brand" href="#"><span class="brand-mark">G</span> GlassNet</a><p>Privacy intelligence for everyone.</p><p>Results are observations, not legal or security advice.</p></footer>
 </body>
