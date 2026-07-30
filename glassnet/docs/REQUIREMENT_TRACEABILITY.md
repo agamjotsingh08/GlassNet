@@ -11,6 +11,8 @@ claiming production capabilities it does not yet have.
 - Network-domain, cookie-metadata, storage-key, and script-source observation
 - No cookie values, credentials, tokens, form content, or response bodies stored
 - Deterministic domain classification, confidence labels, graph data, and privacy score
+- Local SQLite storage for accounts, sessions, websites, scans, jobs, watch targets,
+  audit events, notifications, and feature flags
 - Local report history, comparison, responsive page, graph, chart, and error messages
 - Core API routes: health, scan, history, report, comparison
 

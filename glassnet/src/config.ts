@@ -7,7 +7,6 @@ export const config = {
   scanTimeoutMs: Number(process.env.SCAN_TIMEOUT_MS || 30000),
   maxRequests: Number(process.env.MAX_REQUESTS || 500),
   maxRedirects: Number(process.env.MAX_REDIRECTS || 10),
-  historyFile: path.join(projectRoot, "data", "scans.json"),
   staticFolder: path.join(projectRoot, "static"),
   pageFile: path.join(projectRoot, "templates", "index.html"),
   scannerVersion: "0.2.0-local",

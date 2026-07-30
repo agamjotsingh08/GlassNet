@@ -7,11 +7,12 @@ Browser UI → Express API → URL safety → isolated Playwright browser
                                   ↓
                     observation + classification + report
                                   ↓
-                         local JSON report repository
+                         local SQLite report repository
 ```
 
-GlassNet is currently a modular local application. It does not include accounts,
-shared teams, cloud workers, notifications, or a production database.
+GlassNet is currently a modular local application with SQLite-backed local
+accounts, scans, jobs, audit events, notifications, and watch targets. It does
+not include shared teams, cloud workers, email delivery, or hosted operations.
 
 ## Safety boundary
 
@@ -24,6 +25,6 @@ shared teams, cloud workers, notifications, or a production database.
 
 ## Production path
 
-Before a multi-user launch, replace the JSON repository with a relational database,
-move browser scans into isolated workers, add authentication and authorization, add
-rate limits, and configure logging, monitoring, retention, and incident processes.
+Before a multi-user launch, move the SQLite data to hosted PostgreSQL, move browser
+scans into isolated workers, add rate limits, and configure logging, monitoring,
+retention, and incident processes.

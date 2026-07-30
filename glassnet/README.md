@@ -14,11 +14,14 @@ npm start
 
 Then open `http://127.0.0.1:5000`.
 
-## JSON scan history
+## Local database
 
-Completed scans are stored in `data/scans.json`. This is lightweight and easy to inspect for a personal project. It avoids needing MySQL, SQLite, or a separate database server.
+GlassNet uses Node's built-in SQLite support and stores local data in
+`data/glassnet.sqlite`. This includes local accounts, sessions, websites, scans,
+scan jobs, watch targets, notifications, and audit events. It avoids needing a
+separate database server for a personal project.
 
-For a public application with many people scanning at once, use a real database instead. JSON files are best for small, local projects because simultaneous writes can conflict.
+For a public multi-user deployment, migrate the same model to hosted PostgreSQL.
 
 ## Privacy and safety
 
@@ -34,7 +37,7 @@ form content, or response bodies.
 - `templates/index.html` — page structure.
 - `static/css/style.css` — visual design.
 - `static/js/app.js` — buttons, graph, chart, and API calls.
-- `data/scans.json` — local scan history; Git ignores this file. It is for a local demo, not a shared production database.
+- `data/glassnet.sqlite` — local application database; Git ignores this file.
 - `package.json` — libraries and `npm` commands.
 
 ## Libraries
