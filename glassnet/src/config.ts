@@ -9,5 +9,5 @@ export const config = {
   maxRedirects: Number(process.env.MAX_REDIRECTS || 10),
   staticFolder: path.join(projectRoot, "static"),
   pageFile: path.join(projectRoot, "templates", "index.html"),
-  scannerVersion: "0.3.0-local",
+  scannerVersion: "0.4.0-local",
 };

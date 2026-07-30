@@ -7,26 +7,54 @@ import { config } from "./src/config.js";
 import {
   addPortfolioWebsite,
   addWatch,
+  architectureComparison,
+  attributionForScan,
   baselineForScan,
+  blueprintForScan,
   completeScan,
+  configurationDrift,
+  createApproval,
+  createConsentEvaluation,
+  createDebt,
+  createDecision,
+  createForecast,
   createIssue,
+  createJourney,
   createPortfolio,
+  createRequirement,
   createReview,
   createScan,
+  evidenceChainForScan,
+  evaluateRequirements,
   evaluateRules,
   failScan,
   featureFlags,
   findReport,
+  incidentForScan,
   jobStatus,
+  listApprovals,
+  listConsentEvaluations,
+  listDebt,
+  listDecisions,
+  listForecasts,
   listIssues,
+  listJourneys,
   listPortfolios,
   listReports,
+  listRequirements,
   listReviews,
   listRules,
   listWatches,
+  maturityModel,
+  necessityForScan,
   removeWatch,
   saveFeedback,
+  saveServiceGovernance,
+  scenariosForScan,
+  serviceInventory,
   setBaseline,
+  updateApproval,
+  updateDebt,
   updateIssue,
   updateJob,
   updateReview,
@@ -185,6 +213,119 @@ app.post("/api/portfolios", (request, response) => {
 app.post("/api/portfolios/:id/websites", (request, response) => {
   try { addPortfolioWebsite(Number(request.params.id), Number(request.body?.scan_id)); response.status(204).end(); }
   catch (error) { sendError(response, error); }
+});
+
+app.get("/api/analysis/necessity/:scanId", (request, response) => {
+  try { response.json(necessityForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/attribution/:scanId", (request, response) => {
+  try { response.json(attributionForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/scenarios/:scanId", (request, response) => {
+  try { response.json(scenariosForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/blueprint/:scanId", (request, response) => {
+  try { response.json(blueprintForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/evidence-chain/:scanId", (request, response) => {
+  try { response.json(evidenceChainForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/drift/:scanId", (request, response) => {
+  try { response.json(configurationDrift(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/maturity/:scanId", (request, response) => {
+  try { response.json(maturityModel(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/incident/:scanId", (request, response) => {
+  try { response.json(incidentForScan(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/analysis/architecture", (request, response) => {
+  try { response.json(architectureComparison(Number(request.query.left), Number(request.query.right))); } catch (error) { sendError(response, error, 404); }
+});
+
+app.get("/api/governance/inventory", (_request, response) => response.json(serviceInventory()));
+app.put("/api/governance/services/:domain", (request, response) => {
+  try {
+    response.json(saveServiceGovernance({
+      domain: request.params.domain, owner: request.body?.owner, team: request.body?.team,
+      purpose: request.body?.purpose, approvalStatus: request.body?.approval_status,
+      consentRequirement: request.body?.consent_requirement, reviewDate: request.body?.review_date,
+      notes: request.body?.notes,
+    }));
+  } catch (error) { sendError(response, error); }
+});
+app.get("/api/governance/approvals", (_request, response) => response.json(listApprovals()));
+app.post("/api/governance/approvals", (request, response) => {
+  try { response.status(201).json({ id: createApproval({
+    changeType: String(request.body?.change_type || "service"),
+    title: String(request.body?.title || ""), purpose: String(request.body?.purpose || ""),
+    owner: String(request.body?.owner || ""), expectedImpact: String(request.body?.expected_impact || ""),
+    consentRequirement: String(request.body?.consent_requirement || "review required"),
+    policyUpdateRequired: Boolean(request.body?.policy_update_required), evidence: request.body?.evidence,
+  }) }); } catch (error) { sendError(response, error); }
+});
+app.patch("/api/governance/approvals/:id", (request, response) => {
+  try { response.json(updateApproval(Number(request.params.id), String(request.body?.status))); } catch (error) { sendError(response, error); }
+});
+app.get("/api/governance/decisions", (_request, response) => response.json(listDecisions()));
+app.post("/api/governance/decisions", (request, response) => {
+  try { response.status(201).json({ id: createDecision({
+    title: String(request.body?.title || ""), context: String(request.body?.context || ""),
+    alternatives: String(request.body?.alternatives || ""), decision: String(request.body?.decision || ""),
+    privacyImpact: String(request.body?.privacy_impact || ""), consentImpact: request.body?.consent_impact,
+    performanceImpact: request.body?.performance_impact, owner: String(request.body?.owner || ""),
+    reviewDate: request.body?.review_date, relatedDomain: request.body?.related_domain,
+    relatedScanId: Number(request.body?.related_scan_id) || undefined, replacementPlan: request.body?.replacement_plan,
+  }) }); } catch (error) { sendError(response, error); }
+});
+
+app.get("/api/improvement/debt", (_request, response) => response.json(listDebt()));
+app.post("/api/improvement/debt", (request, response) => {
+  try { response.status(201).json({ id: createDebt({
+    scanId: Number(request.body?.scan_id) || undefined, domain: request.body?.domain,
+    title: String(request.body?.title || ""), category: String(request.body?.category || "documentation"),
+    impact: String(request.body?.impact || "moderate"), complexity: String(request.body?.complexity || "medium"),
+    effortHours: Number(request.body?.effort_hours) || 1, owner: request.body?.owner,
+    evidence: String(request.body?.evidence || ""),
+  }) }); } catch (error) { sendError(response, error); }
+});
+app.patch("/api/improvement/debt/:id", (request, response) => {
+  try { response.json(updateDebt(Number(request.params.id), String(request.body?.status))); } catch (error) { sendError(response, error); }
+});
+
+app.get("/api/testing/requirements", (_request, response) => response.json(listRequirements()));
+app.post("/api/testing/requirements", (request, response) => {
+  try { response.status(201).json({ id: createRequirement(String(request.body?.name || ""), String(request.body?.rule_type || ""), String(request.body?.expected_value || "0")) }); }
+  catch (error) { sendError(response, error); }
+});
+app.get("/api/testing/requirements/:scanId/run", (request, response) => {
+  try { response.json(evaluateRequirements(Number(request.params.scanId))); } catch (error) { sendError(response, error, 404); }
+});
+app.get("/api/testing/forecasts", (_request, response) => response.json(listForecasts()));
+app.post("/api/testing/forecasts", (request, response) => {
+  try { response.status(201).json(createForecast({
+    name: String(request.body?.name || ""), serviceCategory: String(request.body?.service_category || ""),
+    domains: String(request.body?.domains || ""), expectedScripts: Number(request.body?.expected_scripts) || 0,
+    cookieBehavior: String(request.body?.cookie_behavior || "unknown"), storageUse: String(request.body?.storage_use || "unknown"),
+    consentRequirement: String(request.body?.consent_requirement || "review"), pageLocations: request.body?.page_locations,
+    organization: request.body?.organization, dataPurpose: String(request.body?.data_purpose || ""),
+  })); } catch (error) { sendError(response, error); }
+});
+
+app.get("/api/journeys", (_request, response) => response.json(listJourneys()));
+app.post("/api/journeys", (request, response) => {
+  try { response.status(201).json({ id: createJourney(String(request.body?.name || ""), String(request.body?.start_url || ""), Array.isArray(request.body?.steps) ? request.body.steps.map(String) : []) }); }
+  catch (error) { sendError(response, error); }
+});
+app.get("/api/consent/evaluations", (_request, response) => response.json(listConsentEvaluations()));
+app.post("/api/consent/evaluations", (request, response) => {
+  try { response.status(201).json(createConsentEvaluation({
+    scanId: Number(request.body?.scan_id) || undefined,
+    acceptSteps: Number(request.body?.accept_steps), rejectSteps: Number(request.body?.reject_steps),
+    rejectVisible: Boolean(request.body?.reject_visible), granular: Boolean(request.body?.granular),
+    revisitAvailable: Boolean(request.body?.revisit_available), defaultSelections: Boolean(request.body?.default_selections),
+    evaluatorNote: request.body?.evaluator_note,
+  })); } catch (error) { sendError(response, error); }
 });
 
 app.get("/api/watch", (request, response) => {

@@ -14,18 +14,18 @@ const state = {
 };
 
 const commands = [
-  { label: "Scan website", detail: "Start a new investigation", path: "/scan" },
-  { label: "Open recent investigation", detail: "Browse captured snapshots", path: "/investigations" },
-  { label: "Compare scans", detail: "Review observable changes", path: "/compare" },
-  { label: "Create privacy review", detail: "Developer release gate", path: "/reviews" },
-  { label: "Add website monitor", detail: "Track future changes", path: "/monitor" },
-  { label: "Open portfolio", detail: "View several websites", path: "/portfolio" },
-  { label: "Research workspace", detail: "Evidence and reproducibility", path: "/workspace/research" },
-  { label: "Developer rules", detail: "CI thresholds and issues", path: "/workspace/developer" },
+  { label: "Scan website", detail: "Start a new archive case", path: "/scan" },
+  { label: "Open cases", detail: "Browse captured case files", path: "/cases" },
+  { label: "Service inventory", detail: "Review ownership and approvals", path: "/governance/inventory" },
+  { label: "Necessity analyzer", detail: "Separate core and optional dependencies", path: "/improvement/necessity" },
+  { label: "Requirement tests", detail: "Run evidence-linked expectations", path: "/testing/requirements" },
+  { label: "Consent quality", detail: "Evaluate interface balance carefully", path: "/consent" },
+  { label: "Research studio", detail: "Evidence and reproducibility", path: "/studio/research" },
+  { label: "Settings", detail: "Appearance and local account", path: "/settings" },
 ];
 
 document.documentElement.dataset.theme =
-  localStorage.getItem("glassnet-observatory-theme") || "dark";
+  localStorage.getItem("glassnet-archive-theme") || "dark";
 document.documentElement.dataset.density = state.density;
 
 function escapeHtml(value) {
@@ -128,7 +128,7 @@ function landingPreview() {
 }
 
 function renderLanding() {
-  setPage("Network Observatory", "Welcome");
+  setPage("Obsidian Archive", "Welcome");
   activeNavigation("");
   emptyInspector();
   workspace.innerHTML = `
@@ -139,7 +139,7 @@ function renderLanding() {
         <p>GlassNet captures the domains, scripts, cookies, storage systems, and third-party services a website activates—then turns them into a live privacy and dependency map.</p>
         <div class="hero-actions">
           <button class="button primary" data-go="/scan">Scan a website</button>
-          <button class="button secondary" id="open-sample">Open sample investigation</button>
+          <button class="button secondary" id="open-sample">Open sample case</button>
         </div>
         <div class="trust-strip"><span>FRESH ISOLATED BROWSER</span><span>NO COOKIE VALUES</span><span>EVIDENCE BEFORE SCORES</span></div>
       </div>
@@ -198,14 +198,14 @@ async function renderHome() {
   workspace.innerHTML = `
     <section class="page">
       <div class="page-heading">
-        <p class="eyebrow">OBSERVATORY HOME</p>
+        <p class="eyebrow">ARCHIVE HOME</p>
         <h2>Launch an investigation.</h2>
         <p>Follow a website's network trail, inspect evidence, and build a history of how its privacy behavior changes.</p>
       </div>
       ${scanForm(true)}
       <div class="workspace-grid" style="margin-top:18px">
         <section class="repo-panel">
-          <div class="panel-head"><div><h3>Live activity</h3><p>Recent scans and observable changes</p></div><button class="button ghost" data-go="/investigations">View all</button></div>
+          <div class="panel-head"><div><h3>Archive activity</h3><p>Recent cases and observable changes</p></div><button class="button ghost" data-go="/cases">View all</button></div>
           <div>${activityRows(state.scans.slice(0, 5))}</div>
         </section>
         <section class="repo-panel">
@@ -219,8 +219,8 @@ async function renderHome() {
                 <div class="metric-cell"><span>Exposure score</span><strong>${safeNumber(latest.score)}</strong></div>
                 <div class="metric-cell"><span>Third parties</span><strong>${safeNumber(latest.third_parties)}</strong></div>
               </div>
-              <button class="button primary" data-go="/investigations/${latest.id}/overview" style="margin-top:14px;width:100%">Open investigation</button>`
-              : `<div class="empty-state" style="min-height:210px"><div><span>⌁</span><h3>No investigations yet</h3><p>Run your first scan to reveal a website's network ecosystem.</p></div></div>`}
+              <button class="button primary" data-go="/cases/${latest.id}/summary" style="margin-top:14px;width:100%">Open case file</button>`
+              : `<div class="empty-state" style="min-height:210px"><div><span>⌁</span><h3>No cases yet</h3><p>Run your first scan to create an archived website case.</p></div></div>`}
           </div>
         </section>
       </div>
@@ -233,9 +233,9 @@ async function renderHome() {
           <div class="panel-head"><div><h3>Quick actions</h3><p>Common investigation workflows</p></div></div>
           <div class="panel-body stack">
             <button class="button secondary spread" data-go="/scan"><span>Start scan</span><span>→</span></button>
-            <button class="button secondary spread" data-go="/compare"><span>Compare scans</span><span>→</span></button>
-            <button class="button secondary spread" data-go="${latest ? `/investigations/${latest.id}/overview` : "/investigations"}"><span>Open latest investigation</span><span>→</span></button>
-            <button class="button secondary spread" data-go="/monitor"><span>Add website monitor</span><span>→</span></button>
+            <button class="button secondary spread" data-go="/testing/architecture"><span>Compare architectures</span><span>→</span></button>
+            <button class="button secondary spread" data-go="${latest ? `/cases/${latest.id}/summary` : "/cases"}"><span>Open latest case</span><span>→</span></button>
+            <button class="button secondary spread" data-go="/governance/inventory"><span>Review service inventory</span><span>→</span></button>
           </div>
         </section>
       </div>
@@ -246,7 +246,7 @@ async function renderHome() {
 function activityRows(scans) {
   if (!scans.length) return `<div class="empty-state"><div><span>⌁</span><h3>No activity</h3><p>Completed scans and review changes will appear here.</p></div></div>`;
   return scans.map((scan) => `
-    <button class="history-row" data-go="/investigations/${scan.id}/overview" style="width:100%;color:inherit;background:transparent;border-left:0;border-right:0;border-top:0;text-align:left;cursor:pointer">
+    <button class="history-row" data-go="/cases/${scan.id}/summary" style="width:100%;color:inherit;background:transparent;border-left:0;border-right:0;border-top:0;text-align:left;cursor:pointer">
       <span class="status-dot"></span>
       <span><h4>${escapeHtml(scan.site_name)}</h4><p>${escapeHtml(scan.target_domain)} · ${safeNumber(scan.requests)} requests · ${formatDate(scan.created_at)}</p></span>
       <span class="badge pass">${safeNumber(scan.score)}/100</span>
@@ -255,9 +255,9 @@ function activityRows(scans) {
 
 function categoryBars(scan) {
   const groups = [
-    ["Third-party services", safeNumber(scan.third_parties), 20, "var(--cyan)"],
+    ["Third-party services", safeNumber(scan.third_parties), 20, "var(--copper)"],
     ["Observed cookies", safeNumber(scan.cookies), 30, "var(--amber)"],
-    ["Network requests", safeNumber(scan.requests), 150, "var(--steel)"],
+    ["Network requests", safeNumber(scan.requests), 150, "var(--mauve)"],
   ];
   return groups.map(([label, value, max, color]) => `
     <div style="margin:13px 0">
@@ -349,8 +349,8 @@ async function pollJob(jobId) {
     updateLiveProgress(job);
     if (job.status === "completed" && job.report) {
       state.report = job.report;
-      showToast("Investigation completed");
-      navigate(`/investigations/${job.scan_id}/overview`);
+      showToast("Case archived");
+      navigate(`/cases/${job.scan_id}/summary`);
       return;
     }
     if (job.status === "failed") {
@@ -387,27 +387,27 @@ function showScanError(message, scanId = "local") {
         <h3>Browser worker stopped</h3>
         <p>${escapeHtml(message)}</p>
         <p style="margin-top:9px">No private browser data was used. Retrying may help if the website timed out or temporarily blocked automated analysis.</p>
-        <div class="row" style="margin-top:15px"><button class="button primary" data-go="/scan">Try another scan</button><button class="button ghost" data-go="/investigations">Open preserved investigations</button></div>
+        <div class="row" style="margin-top:15px"><button class="button primary" data-go="/scan">Try another scan</button><button class="button ghost" data-go="/cases">Open preserved cases</button></div>
       </div>
     </section>`;
 }
 
 async function openSample() {
   state.report = await api("/api/sample-report");
-  renderInvestigation(state.report, "overview");
-  history.replaceState({}, "", "/investigations/sample/overview");
+  renderInvestigation(state.report, "summary");
+  history.replaceState({}, "", "/cases/sample/summary");
 }
 
 async function renderInvestigations() {
-  setPage("Investigations", "Investigations");
-  activeNavigation("investigations");
+  setPage("Cases", "Cases");
+  activeNavigation("cases");
   emptyInspector();
   await loadScans().catch(() => []);
   workspace.innerHTML = `
     <section class="page">
       <div class="spread page-heading" style="max-width:none">
-        <div><p class="eyebrow">SNAPSHOT REPOSITORY</p><h2>Investigations</h2><p>Each completed scan is a versioned record of observable website behavior.</p></div>
-        <button class="button primary" data-go="/scan">New investigation</button>
+        <div><p class="eyebrow">OBSIDIAN ARCHIVE</p><h2>Case files</h2><p>Each completed scan is an organized, versioned technical analysis—not a legal or criminal case.</p></div>
+        <button class="button primary" data-go="/scan">New case</button>
       </div>
       <div class="table-tools"><input class="field" id="investigation-search" placeholder="Search websites or domains" style="flex:1"><select class="field" id="investigation-sort"><option value="newest">Newest first</option><option value="score">Lowest score</option><option value="domain">Domain</option></select></div>
       <div id="investigation-table">${investigationTable(state.scans)}</div>
@@ -417,7 +417,7 @@ async function renderInvestigations() {
 }
 
 function investigationTable(scans) {
-  if (!scans.length) return `<div class="empty-state"><div><span>◫</span><h3>No investigations</h3><p>Start your first website investigation to reveal its network, storage, and third-party ecosystem.</p><button class="button primary" data-go="/scan">Start investigation</button></div></div>`;
+  if (!scans.length) return `<div class="empty-state"><div><span>▤</span><h3>No cases</h3><p>Start your first website case to reveal its network, storage, and third-party ecosystem.</p><button class="button primary" data-go="/scan">Start case</button></div></div>`;
   return `
     <div class="data-table-wrap"><table class="data-table">
       <thead><tr><th>Website</th><th>Version</th><th>Mode</th><th>Requests</th><th>Third parties</th><th>Cookies</th><th>Score</th></tr></thead>
@@ -447,7 +447,7 @@ async function getReport(scanId) {
   return api(`/api/scans/${scanId}`);
 }
 
-async function renderInvestigationRoute(scanId, tab = "overview") {
+async function renderInvestigationRoute(scanId, tab = "summary") {
   try {
     const report = await getReport(scanId);
     state.report = report;
@@ -458,25 +458,25 @@ async function renderInvestigationRoute(scanId, tab = "overview") {
 }
 
 function renderInvestigation(report, tab) {
-  setPage(report.site_name, `Investigations / ${report.id || "Sample"}`);
-  activeNavigation("investigations");
+  setPage(report.site_name, `Cases / ${report.id || "Sample"}`);
+  activeNavigation("cases");
   emptyInspector();
   clearInterval(state.replayTimer);
   const scanId = report.id || "sample";
   workspace.innerHTML = `
     <section class="page">
-      <header class="investigation-head">
+      <header class="case-file-header">
         <div class="spread">
           <div>
-            <p class="eyebrow">INVESTIGATION ${String(scanId).toUpperCase()} / VERSION ${report.id || "DEMO"}</p>
+            <p class="eyebrow">CASE ${String(scanId).toUpperCase()} / VERSION ${report.id || "DEMO"}</p>
             <h2>${escapeHtml(report.site_name)}</h2>
             <div class="investigation-meta"><span>${escapeHtml(report.target_domain)}</span><span>${escapeHtml(report.mode || "full")} scan</span><span>${formatDate(report.created_at)}</span><span>browser: isolated chromium</span><span>scanner ${escapeHtml(report.scanner_version)}</span></div>
           </div>
           <div class="row"><button class="button ghost" id="export-report">Export JSON</button>${report.id ? `<button class="button secondary" id="set-baseline">Set baseline</button>` : ""}</div>
         </div>
       </header>
-      <nav class="investigation-tabs" aria-label="Investigation sections">
-        ${["overview", "digital-twin", "replay", "consent-lab", "evidence"].map((name) => `<button class="${tab === name ? "active" : ""}" data-investigation-tab="${name}">${titleCase(name)}</button>`).join("")}
+      <nav class="archive-tabs" aria-label="Case sections">
+        ${["summary", "map", "journeys", "evidence", "actions"].map((name) => `<button class="${tab === name ? "active" : ""}" data-investigation-tab="${name}">${titleCase(name)}</button>`).join("")}
       </nav>
       <div id="investigation-content">${investigationContent(report, tab)}</div>
     </section>`;
@@ -484,16 +484,16 @@ function renderInvestigation(report, tab) {
   document.querySelector("#export-report").addEventListener("click", () => downloadJson(report, `glassnet-${report.target_domain}-${scanId}.json`));
   document.querySelector("#set-baseline")?.addEventListener("click", () => createBaseline(report.id));
   document.querySelectorAll("[data-investigation-tab]").forEach((button) => {
-    button.addEventListener("click", () => navigate(`/investigations/${scanId}/${button.dataset.investigationTab}`));
+    button.addEventListener("click", () => navigate(`/cases/${scanId}/${button.dataset.investigationTab}`));
   });
   attachInvestigationActions(report, tab);
 }
 
 function investigationContent(report, tab) {
-  if (tab === "digital-twin") return digitalTwinView(report);
-  if (tab === "replay") return replayView(report);
-  if (tab === "consent-lab") return consentView(report);
+  if (tab === "map") return digitalTwinView(report);
+  if (tab === "journeys") return caseJourneysView(report);
   if (tab === "evidence") return evidenceView(report);
+  if (tab === "actions") return caseActionsView(report);
   return overviewView(report);
 }
 
@@ -552,7 +552,7 @@ function scoreDimensions(report) {
   return dimensions.map(([label, value]) => `
     <div style="margin-bottom:13px">
       <div class="spread" style="font-size:10px"><span>${label}</span><span class="mono">${value}/100</span></div>
-      <div style="height:4px;background:var(--shell-2);margin-top:6px"><div style="height:100%;width:${value}%;background:${value > 70 ? "var(--emerald)" : value > 45 ? "var(--amber)" : "var(--coral)"}"></div></div>
+      <div style="height:4px;background:var(--shell-2);margin-top:6px"><div style="height:100%;width:${value}%;background:${value > 70 ? "var(--gold)" : value > 45 ? "var(--amber)" : "var(--coral)"}"></div></div>
     </div>`).join("") + `<p class="quiet-note">Formula: each dimension starts at 100 and subtracts a visible penalty from observed counts. Limit: one public page load cannot prove legal compliance.</p>`;
 }
 
@@ -585,7 +585,7 @@ function digitalTwinView(report) {
     <div class="repo-panel">
       <div class="panel-head">
         <div><h3>Website Digital Twin</h3><p>${report.graph.nodes.length} nodes · ${report.graph.edges.length} relationships · select a node to inspect</p></div>
-        <div class="legend"><span><i style="background:var(--cyan)"></i>Website</span><span><i style="background:var(--steel)"></i>Functional</span><span><i style="background:var(--amber)"></i>Analytics</span><span><i style="background:var(--coral)"></i>Advertising</span></div>
+        <div class="legend"><span><i style="background:var(--text)"></i>Website</span><span><i style="background:var(--plum)"></i>First party</span><span><i style="background:var(--amber)"></i>Analytics</span><span><i style="background:var(--coral)"></i>Advertising</span><span><i style="background:var(--copper)"></i>Organization</span></div>
       </div>
       <div class="graph-stage">
         <div class="graph-toolbar"><button id="graph-fit">Fit</button><button id="graph-labels">Simple labels</button><button id="graph-export">Export PNG</button></div>
@@ -654,6 +654,216 @@ function consentView(report) {
     </section>`;
 }
 
+function caseJourneysView(report) {
+  return `
+    <div class="case-tools" role="tablist" aria-label="Investigative tools">
+      <button class="button primary" data-case-tool="attribution">Feature attribution</button>
+      <button class="button ghost" data-case-tool="journey">Journey mapper</button>
+      <button class="button ghost" data-case-tool="scenarios">Exposure scenarios</button>
+      <button class="button ghost" data-case-tool="chain">Evidence chain</button>
+      <button class="button ghost" data-case-tool="incident">Incident reconstruction</button>
+    </div>
+    <div id="case-tool-content" style="margin-top:12px">
+      <div class="repo-panel"><div class="panel-body"><p class="quiet-note">Preparing feature attribution…</p></div></div>
+    </div>`;
+}
+
+function caseActionsView(report) {
+  return `
+    <div class="case-tools" role="tablist" aria-label="Improvement tools">
+      <button class="button primary" data-action-tool="necessity">Necessity analyzer</button>
+      <button class="button ghost" data-action-tool="blueprint">Architecture blueprint</button>
+      <button class="button ghost" data-action-tool="substitution">Substitution explorer</button>
+      <button class="button ghost" data-action-tool="debt">Debt ledger</button>
+      <button class="button ghost" data-action-tool="maturity">Maturity model</button>
+    </div>
+    <div id="action-tool-content" style="margin-top:12px">
+      <div class="repo-panel"><div class="panel-body"><p class="quiet-note">Preparing dependency necessity analysis…</p></div></div>
+    </div>`;
+}
+
+async function setupCaseJourneys(report) {
+  const buttons = document.querySelectorAll("[data-case-tool]");
+  const choose = async (name) => {
+    buttons.forEach((button) => {
+      button.classList.toggle("primary", button.dataset.caseTool === name);
+      button.classList.toggle("ghost", button.dataset.caseTool !== name);
+    });
+    const target = document.querySelector("#case-tool-content");
+    target.innerHTML = `<div class="repo-panel"><div class="panel-body"><p class="quiet-note">Loading structured case evidence…</p></div></div>`;
+    if (!report.id) {
+      if (name === "attribution") return target.innerHTML = attributionSurface(report.services.map((service) => ({ feature: service.category, initiating_script: report.scripts.find((script) => script.includes(service.domain)) || "Initiator not captured", service: service.name, domain: service.domain, requests: service.requests, storage: report.cookies.filter((cookie) => cookie.domain === service.domain).length, purpose: service.category, confidence: service.confidence === "verified" ? "confirmed classification" : "inferred from captured category" })));
+      if (name === "scenarios") return target.innerHTML = scenarioSurface(Object.entries(report.categories).map(([category, count]) => ({ name: `${category} exposure scenario`, services: report.services.filter((service) => service.category === category).map((service) => service.name), observed_identifiers: `${report.cookies.filter((cookie) => !cookie.session).length} persistent cookie attribute records`, persistence: "Technically possible based on observed signals", evidence: `${count} classified service(s)`, assumptions: "Category indicates a possible purpose.", uncertainty: "No request bodies or personal data were inspected." })));
+      if (name === "chain") return target.innerHTML = chainSurface(report.services.map((service) => ({ finding: `${service.name} observed`, confidence: service.confidence, rule_version: report.scanner_version, steps: [{ label: "Observed", detail: `${service.requests} requests to ${service.domain}`, timestamp: 0 }, { label: "Classified", detail: service.category, timestamp: 0 }, { label: "Inferred", detail: service.explanation, timestamp: 0 }] })));
+      if (name === "incident") return target.innerHTML = incidentSurface({ target: report.target_domain, services: report.services.map((service) => ({ service: service.name, domain: service.domain, first_seen_scan: "sample", first_seen_at: "sample fixture", initiating_script: report.scripts.find((script) => script.includes(service.domain)) || "Not captured", consent_state: report.consent.status, persistence: 1, evidence_events: report.events.filter((event) => event.destination === service.domain).length })), versions: [] });
+    }
+    if (name === "journey") return renderJourneyBuilder(target);
+    try {
+      if (name === "attribution") target.innerHTML = attributionSurface(await api(`/api/analysis/attribution/${report.id}`));
+      if (name === "scenarios") target.innerHTML = scenarioSurface(await api(`/api/analysis/scenarios/${report.id}`));
+      if (name === "chain") target.innerHTML = chainSurface(await api(`/api/analysis/evidence-chain/${report.id}`));
+      if (name === "incident") target.innerHTML = incidentSurface(await api(`/api/analysis/incident/${report.id}`));
+    } catch (error) {
+      target.innerHTML = `<div class="error-state"><h3>Case tool unavailable</h3><p>${escapeHtml(error.message)}</p></div>`;
+    }
+  };
+  buttons.forEach((button) => button.addEventListener("click", () => choose(button.dataset.caseTool)));
+  await choose("attribution");
+}
+
+function attributionSurface(items) {
+  return `
+    <section class="repo-panel">
+      <div class="panel-head"><div><h3>Feature-to-Tracker Attribution</h3><p>Visible-purpose hypotheses connected to captured technical dependencies</p></div><span class="badge ai">INFERENCE LABELED</span></div>
+      <div>${items.map((item) => `
+        <div class="feature-chain panel-body" style="border-bottom:1px solid var(--line)">
+          <div class="chain-step"><span class="evidence-label inferred">Inferred feature</span><strong>${escapeHtml(item.feature)}</strong></div>
+          <div class="chain-step"><span class="evidence-label observed">Initiator</span><strong class="mono">${escapeHtml(item.initiating_script)}</strong></div>
+          <div class="chain-step"><span class="evidence-label classified">Service</span><strong>${escapeHtml(item.service)}</strong></div>
+          <div class="chain-step"><span class="evidence-label observed">Footprint</span><strong>${safeNumber(item.requests)} requests · ${safeNumber(item.storage)} storage signals</strong></div>
+          <div class="chain-step"><span class="evidence-label inferred">Confidence</span><strong>${escapeHtml(item.confidence)}</strong></div>
+        </div>`).join("") || `<div class="empty-state"><div><span>⌁</span><h3>No feature attribution available</h3><p>No third-party services were captured in this case.</p></div></div>`}</div>
+    </section>`;
+}
+
+function scenarioSurface(items) {
+  return `<div class="archive-grid">${items.map((item) => `
+    <article class="evidence-sheet">
+      <span class="evidence-label inferred">Scenario</span>
+      <h3>${escapeHtml(item.name)}</h3>
+      <p>${escapeHtml(item.persistence)}</p>
+      <div class="inspector-row"><span>Services</span><strong>${escapeHtml((item.services || []).join(", ") || "None")}</strong></div>
+      <div class="inspector-row"><span>Identifiers</span><strong>${escapeHtml(item.observed_identifiers)}</strong></div>
+      <p class="quiet-note"><strong>Evidence:</strong> ${escapeHtml(item.evidence)}</p>
+      <p class="quiet-note"><strong>Assumption:</strong> ${escapeHtml(item.assumptions)}</p>
+      <p class="quiet-note"><strong>Uncertainty:</strong> ${escapeHtml(item.uncertainty)}</p>
+    </article>`).join("") || `<div class="empty-state"><div><h3>No scenarios generated</h3><p>The case did not contain enough category evidence.</p></div></div>`}</div>`;
+}
+
+function chainSurface(chains) {
+  return `<div class="stack">${chains.map((chain) => `
+    <section class="repo-panel">
+      <div class="panel-head"><div><h3>${escapeHtml(chain.finding)}</h3><p>Rule ${escapeHtml(chain.rule_version)} · confidence ${escapeHtml(chain.confidence)}</p></div></div>
+      <div class="panel-body feature-chain">${chain.steps.slice(0, 5).map((step) => `<div class="chain-step"><span class="evidence-label ${step.label.toLowerCase()}">${escapeHtml(step.label)}</span><strong>${escapeHtml(step.detail)}</strong><small class="mono quiet-note">+${safeNumber(step.timestamp)}ms</small></div>`).join("")}</div>
+    </section>`).join("") || `<div class="empty-state"><div><h3>No evidence chain</h3><p>No connected observations were captured.</p></div></div>`}</div>`;
+}
+
+function incidentSurface(incident) {
+  return `
+    <section class="repo-panel">
+      <div class="panel-head"><div><h3>Incident Reconstruction</h3><p>${escapeHtml(incident.target)} · evidence timeline</p></div><button class="button ghost" id="export-incident">Export evidence</button></div>
+      <div>${incident.services.map((item) => `<div class="history-row"><span class="status-symbol attention">!</span><span><h4>${escapeHtml(item.service)}</h4><p>First seen case ${escapeHtml(item.first_seen_scan)} · ${escapeHtml(formatDate(item.first_seen_at))} · persisted across ${safeNumber(item.persistence)} version(s)</p><p class="mono">${escapeHtml(item.initiating_script)}</p></span><span class="badge">${safeNumber(item.evidence_events)} events</span></div>`).join("") || `<div class="empty-state"><div><h3>No incident candidates</h3><p>No third-party appearance could be reconstructed.</p></div></div>`}</div>
+    </section>`;
+}
+
+async function renderJourneyBuilder(target) {
+  const journeys = await api("/api/journeys").catch(() => []);
+  target.innerHTML = `
+    <div class="workspace-grid equal">
+      <section class="repo-panel">
+        <div class="panel-head"><div><h3>User Journey Mapper</h3><p>Define safe, public, non-submitting navigation only</p></div></div>
+        <form id="journey-form" class="panel-body archive-form">
+          <label>Name<input class="field" name="name" required placeholder="Landing to pricing"></label>
+          <label>Start URL<input class="field" name="start_url" required placeholder="https://example.com"></label>
+          <label class="wide">Navigation steps<textarea class="field" name="steps" required placeholder="Open pricing link&#10;Open cookie preferences"></textarea></label>
+          <button class="button primary" type="submit">Save safe journey</button>
+        </form>
+      </section>
+      <section class="repo-panel">
+        <div class="panel-head"><div><h3>Defined journeys</h3><p>Definitions are not executed automatically</p></div></div>
+        <div>${journeys.map((journey) => `<div class="history-row"><span class="status-symbol unknown">○</span><span><h4>${escapeHtml(journey.name)}</h4><p>${escapeHtml(journey.start_url)} · ${journey.steps.length} safe step(s)</p></span><span class="badge">${escapeHtml(journey.status)}</span></div>`).join("") || `<div class="empty-state"><div><h3>No journeys</h3><p>Define a public route sequence without submitting forms or signing in.</p></div></div>`}</div>
+      </section>
+    </div>`;
+  document.querySelector("#journey-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    await api("/api/journeys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: values.get("name"), start_url: values.get("start_url"), steps: String(values.get("steps")).split("\n").map((step) => step.trim()).filter(Boolean) }) });
+    showToast("Safe journey definition archived");
+    renderJourneyBuilder(target);
+  });
+}
+
+async function setupCaseActions(report) {
+  const buttons = document.querySelectorAll("[data-action-tool]");
+  const choose = async (name) => {
+    buttons.forEach((button) => {
+      button.classList.toggle("primary", button.dataset.actionTool === name);
+      button.classList.toggle("ghost", button.dataset.actionTool !== name);
+    });
+    const target = document.querySelector("#action-tool-content");
+    target.innerHTML = `<div class="repo-panel"><div class="panel-body"><p class="quiet-note">Loading improvement evidence…</p></div></div>`;
+    if (name === "debt") return renderDebtLedger(target, report);
+    if (!report.id) {
+      const necessity = report.services.map((service) => ({ domain: service.domain, service: service.name, purpose: service.category, verdict: service.essential === true ? "Essential" : service.confidence === "unknown" ? "Unknown" : service.category === "Advertising" ? "Likely unnecessary" : "Optional", triggered_by: service.types.includes("script") ? "page script" : service.types[0], activates_before_interaction: true, feature_dependency: service.category, removal_risk: service.essential === true ? "High" : "Unknown until tested", first_party_alternative: "Architectural review possible", confidence: service.confidence, evidence: `${service.requests} requests` }));
+      if (name === "necessity") return target.innerHTML = necessitySurface(necessity);
+      if (name === "substitution") return target.innerHTML = substitutionSurface(necessity);
+      if (name === "blueprint") return target.innerHTML = blueprintSurface({ current: { first_party_domains: report.first_party.map((item) => item.domain), third_party_services: necessity, consent_boundary: report.consent.status, storage_keys: report.summary.storage_keys }, proposed: { preserve: necessity.filter((item) => item.verdict === "Essential").map((item) => item.service), delay_until_choice_or_interaction: necessity.filter((item) => item.verdict === "Optional").map((item) => item.service), consolidate: [], first_party_opportunities: [], storage_actions: ["Review storage boundaries"], implementation_order: ["Confirm ownership", "Validate necessity", "Test delayed loading", "Verify with a new case"], verification: "Compare a new case against this archived version." }, limitations: "Guidance only." });
+      if (name === "maturity") return target.innerHTML = maturitySurface({ dimensions: [{ name: "Service inventory", level: 2, label: "Documented", evidence: "Sample inventory", next_action: "Add owners" }, { name: "Ownership", level: 1, label: "Unmanaged", evidence: "No owners in sample", next_action: "Assign owners" }], disclaimer: "Maturity is not legal compliance." });
+    }
+    try {
+      if (name === "necessity") target.innerHTML = necessitySurface(await api(`/api/analysis/necessity/${report.id}`));
+      if (name === "blueprint") target.innerHTML = blueprintSurface(await api(`/api/analysis/blueprint/${report.id}`));
+      if (name === "substitution") target.innerHTML = substitutionSurface(await api(`/api/analysis/necessity/${report.id}`));
+      if (name === "maturity") target.innerHTML = maturitySurface(await api(`/api/analysis/maturity/${report.id}`));
+    } catch (error) {
+      target.innerHTML = `<div class="error-state"><h3>Improvement tool unavailable</h3><p>${escapeHtml(error.message)}</p></div>`;
+    }
+  };
+  buttons.forEach((button) => button.addEventListener("click", () => choose(button.dataset.actionTool)));
+  await choose("necessity");
+}
+
+function necessitySurface(items) {
+  return `
+    <section class="repo-panel">
+      <div class="panel-head"><div><h3>Third-Party Necessity Analyzer</h3><p>Necessity considers purpose and breakage risk—not “third party” alone</p></div></div>
+      <div class="data-table-wrap" style="border:0"><table class="data-table"><thead><tr><th>Service</th><th>Purpose</th><th>Verdict</th><th>Trigger</th><th>Removal risk</th><th>Evidence</th></tr></thead><tbody>${items.map((item) => `<tr><td><strong>${escapeHtml(item.service)}</strong><br><span class="domain">${escapeHtml(item.domain)}</span></td><td>${escapeHtml(item.purpose)}</td><td><span class="badge ${item.verdict === "Essential" ? "pass" : item.verdict === "Likely unnecessary" ? "fail" : "warn"}">${escapeHtml(item.verdict)}</span></td><td>${escapeHtml(item.triggered_by)}</td><td>${escapeHtml(item.removal_risk)}</td><td class="mono">${escapeHtml(item.evidence)}</td></tr>`).join("")}</tbody></table></div>
+    </section>`;
+}
+
+function blueprintSurface(data) {
+  return `
+    <div class="workspace-grid equal">
+      <section class="repo-panel"><div class="panel-head"><h3>Current architecture</h3><span class="evidence-label observed">Observed</span></div><div class="panel-body"><div class="inspector-row"><span>First-party domains</span><strong>${escapeHtml((data.current.first_party_domains || []).join(", ") || "None captured")}</strong></div><div class="inspector-row"><span>Third-party services</span><strong>${data.current.third_party_services.length}</strong></div><div class="inspector-row"><span>Consent boundary</span><strong>${escapeHtml(data.current.consent_boundary)}</strong></div><div class="inspector-row"><span>Storage keys</span><strong>${safeNumber(data.current.storage_keys)}</strong></div></div></section>
+      <section class="evidence-sheet"><span class="evidence-label recommended">Proposed</span><h3>Privacy architecture blueprint</h3><div class="inspector-row"><span>Preserve</span><strong>${escapeHtml(data.proposed.preserve.join(", ") || "Confirm core services")}</strong></div><div class="inspector-row"><span>Delay</span><strong>${escapeHtml(data.proposed.delay_until_choice_or_interaction.join(", ") || "None identified")}</strong></div><div class="inspector-row"><span>Consolidate</span><strong>${escapeHtml(data.proposed.consolidate.join(", ") || "No duplicate category observed")}</strong></div><ol>${data.proposed.implementation_order.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol><p class="quiet-note">${escapeHtml(data.limitations)}</p></section>
+    </div>`;
+}
+
+function substitutionSurface(items) {
+  const alternatives = [
+    ["First-party implementation", "Lower external exposure", "High", "Higher maintenance", "Verify with a new case"],
+    ["Delayed optional loading", "Reduces pre-interaction activity", "Medium", "Feature loads later", "Compare initial event sequence"],
+    ["Consent-gated loading", "Aligns optional service activation", "Medium", "Depends on reliable consent state", "Run consent evidence case"],
+    ["Feature removal", "Removes associated dependency", "Low–Medium", "Visible feature unavailable", "Confirm graph node disappears"],
+  ];
+  return `<div class="archive-grid">${items.map((item) => `<article class="repo-panel"><div class="panel-head"><div><h3>${escapeHtml(item.service)}</h3><p>${escapeHtml(item.verdict)} · ${escapeHtml(item.purpose)}</p></div></div><div class="panel-body">${alternatives.map((option) => `<div class="inspector-row"><span>${option[0]}</span><strong>${option[1]} · ${option[2]}</strong></div>`).join("")}<p class="quiet-note">Architectural categories only; GlassNet does not recommend an unverified commercial vendor.</p></div></article>`).join("")}</div>`;
+}
+
+function maturitySurface(data) {
+  return `
+    <section class="repo-panel"><div class="panel-head"><div><h3>Website Privacy Maturity Model</h3><p>Observable process evidence, not legal compliance</p></div></div><div>${data.dimensions.map((item) => `<div class="finding-row"><span class="status-symbol ${item.level >= 3 ? "verified" : item.level === 2 ? "attention" : "unknown"}"><span>${item.level >= 3 ? "✓" : item.level}</span></span><span><h4>${escapeHtml(item.name)} · ${escapeHtml(item.label)}</h4><p>${escapeHtml(item.evidence)} · Next: ${escapeHtml(item.next_action)}</p><div class="maturity-levels">${[1,2,3,4,5].map((level) => `<i class="maturity-level ${level <= item.level ? "active" : ""}"></i>`).join("")}</div></span><span class="badge">${item.level}/5</span></div>`).join("")}</div><div class="panel-body quiet-note">${escapeHtml(data.disclaimer)}</div></section>`;
+}
+
+async function renderDebtLedger(target, report) {
+  const items = await api("/api/improvement/debt").catch(() => []);
+  target.innerHTML = `
+    <div class="workspace-grid equal">
+      <section class="repo-panel"><div class="panel-head"><div><h3>Privacy Debt Ledger</h3><p>Age, impact, effort, and ownership stay visible</p></div></div><div>${items.map((item) => `<div class="issue-row"><span class="status-symbol ${item.impact === "serious" || item.impact === "high" ? "serious" : "attention"}">!</span><span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.domain || "case-wide")} · ${escapeHtml(item.impact)} impact · ${safeNumber(item.effort_hours)}h · owner ${escapeHtml(item.owner || "unassigned")}</p></span><button class="button ghost" data-debt-resolve="${item.id}">${item.status === "resolved" ? "Resolved" : "Resolve"}</button></div>`).join("") || `<div class="empty-state"><div><h3>No debt items</h3><p>Archive a recurring or aging privacy problem here.</p></div></div>`}</div></section>
+      <section class="repo-panel"><div class="panel-head"><h3>Record debt</h3></div><form id="debt-form" class="panel-body archive-form"><input type="hidden" name="scan_id" value="${report.id || ""}"><label>Title<input class="field" name="title" required></label><label>Domain<input class="field" name="domain"></label><label>Impact<select class="field" name="impact"><option>moderate</option><option>high</option><option>serious</option><option>low</option></select></label><label>Complexity<select class="field" name="complexity"><option>medium</option><option>low</option><option>high</option></select></label><label>Effort hours<input class="field" name="effort_hours" type="number" min="1" value="4"></label><label>Owner<input class="field" name="owner"></label><label class="wide">Evidence<textarea class="field" name="evidence" required></textarea></label><button class="button primary" type="submit">Archive debt item</button></form></section>
+    </div>`;
+  document.querySelector("#debt-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    await api("/api/improvement/debt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...values, category: "case evidence", effort_hours: Number(values.effort_hours), scan_id: Number(values.scan_id) || undefined }) });
+    showToast("Debt item archived");
+    renderDebtLedger(target, report);
+  });
+  document.querySelectorAll("[data-debt-resolve]").forEach((button) => button.addEventListener("click", async () => {
+    await api(`/api/improvement/debt/${button.dataset.debtResolve}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "resolved" }) });
+    renderDebtLedger(target, report);
+  }));
+}
+
 function evidenceView(report) {
   const evidenceRows = [
     ...Object.entries(report.security_headers || {}).map(([name, value]) => ({ type: "header", source: report.target_domain, detail: `${name}: ${value}` })),
@@ -662,9 +872,10 @@ function evidenceView(report) {
     ...report.scripts.map((script) => ({ type: "script", source: new URL(script).hostname, detail: script })),
   ];
   return `
+    <div class="evidence-sheet" style="margin-bottom:12px"><span class="evidence-label observed">Observed</span> <span class="evidence-label classified">Classified</span> <span class="evidence-label inferred">Inferred</span> <span class="evidence-label recommended">Recommended</span> <span class="evidence-label confirmed">Confirmed by reviewer</span><p class="quiet-note">This surface separates captured technical facts from classification, interpretation, recommendations, and human confirmation.</p></div>
     <div class="table-tools"><input class="field" id="evidence-search" placeholder="Search evidence" style="flex:1"><select class="field" id="evidence-filter"><option value="">All evidence</option><option value="header">Headers</option><option value="cookie">Cookies</option><option value="script">Scripts</option><option value="localStorage">Local storage</option></select><button class="button ghost" id="export-evidence">Export</button></div>
     <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Type</th><th>Source</th><th>Observed metadata</th></tr></thead><tbody id="evidence-body">${evidenceTableRows(evidenceRows)}</tbody></table></div>
-    <div class="repo-panel" style="margin-top:12px"><div class="panel-head"><h3>Methodology and limitations</h3></div><div class="panel-body"><ul class="quiet-note" style="line-height:1.8">${report.limitations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><div class="inspector-row"><span>Scanner version</span><strong class="mono">${escapeHtml(report.scanner_version)}</strong></div><div class="inspector-row"><span>Mode</span><strong>${escapeHtml(report.mode || "full")}</strong></div></div></div>`;
+    <div class="evidence-sheet" style="margin-top:12px"><span class="evidence-label observed">Methodology</span><h3>Limitations and reproducibility</h3><ul class="quiet-note" style="line-height:1.8">${report.limitations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><div class="inspector-row"><span>Scanner version</span><strong class="mono">${escapeHtml(report.scanner_version)}</strong></div><div class="inspector-row"><span>Mode</span><strong>${escapeHtml(report.mode || "full")}</strong></div></div>`;
 }
 
 function evidenceTableRows(rows) {
@@ -674,10 +885,11 @@ function evidenceTableRows(rows) {
 function attachInvestigationActions(report, tab) {
   document.querySelectorAll("[data-finding-title]").forEach((button) => button.addEventListener("click", () => showInspector(button.dataset.findingTitle, report.target_domain, [["Scan", String(report.id || "sample")], ["Status", button.querySelector(".badge")?.textContent || "Observed"], ["Evidence", "Captured metadata"]], button.dataset.findingDescription)));
   document.querySelectorAll("[data-organization]").forEach((button) => button.addEventListener("click", () => showInspector(button.dataset.organization, "organization group", [["Requests", button.querySelector(".badge").textContent], ["Confidence", button.dataset.organization === "Unresolved ownership" ? "unknown" : "likely"]], "Organization grouping is based on the local service classification catalog.")));
-  document.querySelector("[data-open-twin]")?.addEventListener("click", () => navigate(`/investigations/${report.id || "sample"}/digital-twin`));
-  if (tab === "digital-twin") setupDigitalTwin(report);
-  if (tab === "replay") setupReplay(report);
+  document.querySelector("[data-open-twin]")?.addEventListener("click", () => navigate(`/cases/${report.id || "sample"}/map`));
+  if (tab === "map") setupDigitalTwin(report);
+  if (tab === "journeys") setupCaseJourneys(report);
   if (tab === "evidence") setupEvidence(report);
+  if (tab === "actions") setupCaseActions(report);
 }
 
 async function loadCytoscape() {
@@ -700,13 +912,13 @@ async function setupDigitalTwin(report) {
       elements: [...report.graph.nodes, ...report.graph.edges],
       layout: { name: "concentric", padding: 58, minNodeSpacing: 55, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches },
       style: [
-        { selector: "node", style: { label: "data(label)", color: "#cbd7d3", "font-family": "Cascadia Code", "font-size": 9, "text-valign": "bottom", "text-margin-y": 9, "text-wrap": "wrap", "text-max-width": 84, width: 34, height: 34, "background-color": "#6d91c8", "border-width": 2, "border-color": "#9ab2d5" } },
-        { selector: 'node[kind = "website"]', style: { shape: "hexagon", width: 72, height: 72, "background-color": "#58c9cf", "border-color": "#b6eef0", color: "#f0eee7", "font-size": 11 } },
-        { selector: 'node[kind = "Advertising"]', style: { shape: "diamond", "background-color": "#d96f62", "border-color": "#efa69e" } },
-        { selector: 'node[kind = "Analytics"]', style: { shape: "diamond", "background-color": "#d9a957", "border-color": "#efd09a" } },
-        { selector: 'node[kind = "Unknown"]', style: { "background-color": "#14201f", "border-style": "dashed", "border-color": "#a894c8" } },
-        { selector: "edge", style: { width: 1.3, "line-color": "#3b6663", "target-arrow-color": "#58c9cf", "target-arrow-shape": "triangle", "curve-style": "bezier", opacity: .75 } },
-        { selector: ":selected", style: { "border-width": 4, "border-color": "#f0eee7", "line-color": "#58c9cf", "target-arrow-color": "#58c9cf" } },
+        { selector: "node", style: { label: "data(label)", color: "#e4d5bf", "font-family": "Cascadia Code", "font-size": 9, "text-valign": "bottom", "text-margin-y": 9, "text-wrap": "wrap", "text-max-width": 84, width: 34, height: 34, "background-color": "#8f4d79", "border-width": 2, "border-color": "#b87745" } },
+        { selector: 'node[kind = "website"]', style: { shape: "hexagon", width: 72, height: 72, "background-color": "#f3eadc", "border-color": "#b87745", color: "#f3eadc", "font-size": 11 } },
+        { selector: 'node[kind = "Advertising"]', style: { shape: "diamond", "background-color": "#a9434d", "border-color": "#d88a80" } },
+        { selector: 'node[kind = "Analytics"]', style: { shape: "diamond", "background-color": "#d29b55", "border-color": "#ead0a0" } },
+        { selector: 'node[kind = "Unknown"]', style: { "background-color": "#30242e", "border-style": "dashed", "border-color": "#9d918a" } },
+        { selector: "edge", style: { width: 1.3, "line-color": "#773445", "target-arrow-color": "#b87745", "target-arrow-shape": "triangle", "curve-style": "bezier", opacity: .78 } },
+        { selector: ":selected", style: { "border-width": 4, "border-color": "#f3eadc", "line-color": "#d29b55", "target-arrow-color": "#d29b55" } },
       ],
     });
     state.network.on("tap", "node", (event) => {
@@ -727,7 +939,7 @@ async function setupDigitalTwin(report) {
     });
     document.querySelector("#graph-export").addEventListener("click", () => {
       const link = document.createElement("a");
-      link.href = state.network.png({ full: true, scale: 2, bg: "#0b1514" });
+      link.href = state.network.png({ full: true, scale: 2, bg: "#211a20" });
       link.download = `glassnet-twin-${report.target_domain}.png`;
       link.click();
     });
@@ -787,8 +999,8 @@ function renderReplayEvent(report, index) {
   if (!event) return;
   document.querySelector("#replay-stage").innerHTML = `
     <div style="position:absolute;left:18%;top:42%" class="preview-node root">${escapeHtml(report.target_domain)}</div>
-    <div style="position:absolute;right:18%;top:42%;border-color:${event.type === "cookie" ? "var(--amber)" : "var(--cyan)"}" class="preview-node">${escapeHtml(event.destination)}</div>
-    <div style="position:absolute;left:42%;top:49%;width:18%;height:1px;background:var(--cyan)"><span class="pulse-dot" style="animation-duration:.8s"></span></div>`;
+    <div style="position:absolute;right:18%;top:42%;border-color:${event.type === "cookie" ? "var(--amber)" : "var(--plum)"}" class="preview-node">${escapeHtml(event.destination)}</div>
+    <div style="position:absolute;left:42%;top:49%;width:18%;height:1px;background:var(--plum)"><span class="pulse-dot" style="animation-duration:.8s"></span></div>`;
   showInspector(titleCase(event.type), event.destination, [["Sequence", String(event.sequence)], ["Offset", `+${event.offset_ms}ms`], ["Category", event.category], ["Consent state", event.consent_state]], `${event.source} activated ${event.destination}.`);
 }
 
@@ -954,7 +1166,7 @@ async function renderPortfolio() {
   await loadScans().catch(() => []);
   workspace.innerHTML = `
     <section class="page">
-      <div class="spread page-heading" style="max-width:none"><div><p class="eyebrow">MULTI-SITE OBSERVATORY</p><h2>Portfolio Intelligence</h2><p>Track scan health, exposure, and unresolved changes across a group of websites.</p></div><button class="button primary" id="new-portfolio">New portfolio</button></div>
+      <div class="spread page-heading" style="max-width:none"><div><p class="eyebrow">MULTI-SITE ARCHIVE</p><h2>Portfolio Intelligence</h2><p>Track scan health, exposure, and unresolved changes across a group of websites.</p></div><button class="button primary" id="new-portfolio">New portfolio</button></div>
       <div id="portfolio-list">${portfolios.length ? portfolios.map(portfolioCard).join("") : `<div class="empty-state"><div><span>▦</span><h3>No portfolio</h3><p>Add websites to create a portfolio-level privacy overview.</p><button class="button primary" id="empty-new-portfolio">Create portfolio</button></div></div>`}</div>
     </section>`;
   document.querySelector("#new-portfolio")?.addEventListener("click", createPortfolioPrompt);
@@ -1053,7 +1265,7 @@ function issueRow(issue) {
 async function runCiGate() {
   const scanId = document.querySelector("#ci-scan").value;
   const result = await api(`/api/ci/${scanId}`);
-  document.querySelector("#ci-result").innerHTML = `<div class="panel-body"><span class="badge ${result.status === "pass" ? "pass" : "fail"}">GATE ${result.status.toUpperCase()}</span>${result.checks.map((check) => `<div class="inspector-row"><span>${escapeHtml(check.name)}</span><strong style="color:${check.status === "pass" ? "var(--emerald)" : "var(--coral)"}">${check.actual} / limit ${check.limit}</strong></div>`).join("")}</div>`;
+  document.querySelector("#ci-result").innerHTML = `<div class="panel-body"><span class="badge ${result.status === "pass" ? "pass" : "fail"}">GATE ${result.status.toUpperCase()}</span>${result.checks.map((check) => `<div class="inspector-row"><span>${escapeHtml(check.name)}</span><strong style="color:${check.status === "pass" ? "var(--gold)" : "var(--coral)"}">${check.actual} / limit ${check.limit}</strong></div>`).join("")}</div>`;
 }
 
 async function createIssuePrompt() {
@@ -1158,7 +1370,7 @@ async function handleAccount(event) {
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
-  localStorage.setItem("glassnet-observatory-theme", next);
+  localStorage.setItem("glassnet-archive-theme", next);
   showToast(`${titleCase(next)} theme selected`);
 }
 
@@ -1188,11 +1400,276 @@ function titleCase(value) {
   return String(value).replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function workspaceIntro(area, title, copy, records) {
+  return `
+    <section class="page">
+      <div class="page-heading"><p class="eyebrow">${escapeHtml(area)}</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></div>
+      <div class="archive-grid">${records.map((record) => `
+        <button class="archive-record" data-go="${record.path}">
+          <span class="version-seal"><span>${record.icon}</span></span>
+          <h3>${escapeHtml(record.title)}</h3><p>${escapeHtml(record.copy)}</p>
+        </button>`).join("")}</div>
+    </section>`;
+}
+
+async function renderGovernance(section = "") {
+  setPage(section ? titleCase(section) : "Govern", `Govern${section ? ` / ${titleCase(section)}` : ""}`);
+  activeNavigation("governance");
+  emptyInspector();
+  if (!section) {
+    workspace.innerHTML = workspaceIntro("GOVERNANCE ARCHIVE", "Make privacy responsibility visible.", "Inventories, owners, approvals, tag controls, and architecture decisions stay connected to observed services.", [
+      { icon: "I", title: "Service Inventory", copy: "A continuously updated portfolio-wide list of observed third parties.", path: "/governance/inventory" },
+      { icon: "O", title: "Ownership Matrix", copy: "Assign teams, owners, purposes, review dates, and approval states.", path: "/governance/ownership" },
+      { icon: "T", title: "Tag Manager Governance", copy: "Separate indirectly loaded tags from approved, owned behavior.", path: "/governance/tag-manager" },
+      { icon: "A", title: "Change Approvals", copy: "Move proposed privacy changes through accountable review states.", path: "/governance/approvals" },
+      { icon: "D", title: "Decision Records", copy: "Preserve why an architecture choice was made and when to revisit it.", path: "/governance/decisions" },
+    ]);
+    return;
+  }
+  if (section === "inventory" || section === "ownership" || section === "tag-manager") return renderInventory(section);
+  if (section === "approvals") return renderApprovals();
+  if (section === "decisions") return renderDecisions();
+}
+
+async function renderInventory(view) {
+  const inventory = await api("/api/governance/inventory");
+  const visible = view === "ownership" ? inventory.filter((item) => !item.owner || item.approval_status !== "approved") :
+    view === "tag-manager" ? inventory.filter((item) => /tag|manager/i.test(`${item.service} ${item.category} ${item.domain}`)) : inventory;
+  workspace.innerHTML = `
+    <section class="page">
+      <div class="spread page-heading" style="max-width:none"><div><p class="eyebrow">GOVERN / ${escapeHtml(view)}</p><h2>${view === "inventory" ? "Public Website Service Inventory" : view === "ownership" ? "Privacy Ownership Matrix" : "Tag Manager Governance Center"}</h2><p>${view === "tag-manager" ? "Only publicly observable tag behavior is shown; sensitive container configuration is not collected." : "Observed services are reconciled with reviewed purpose, ownership, consent, and approval metadata."}</p></div><button class="button secondary" data-go="/governance">Govern index</button></div>
+      <div class="metric-strip">${metricCell("Services", visible.length, "visible records")}${metricCell("Unowned", visible.filter((item) => !item.owner).length, "needs owner")}${metricCell("Unapproved", visible.filter((item) => item.approval_status !== "approved").length, "needs review")}${metricCell("Websites", new Set(visible.flatMap((item) => item.websites)).size, "observed")}${metricCell("Unknown", visible.filter((item) => item.confidence === "unknown").length, "classification")}</div>
+      <div class="table-tools"><input class="field" id="inventory-search" placeholder="Search service, domain, owner, or team" style="flex:1"><button class="button primary" id="edit-governance" ${visible.length ? "" : "disabled"}>Review selected service</button></div>
+      <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Select</th><th>Service</th><th>Websites</th><th>Purpose</th><th>Owner / team</th><th>Approval</th><th>Consent</th><th>First / last seen</th></tr></thead><tbody id="inventory-body">${inventoryRows(visible)}</tbody></table></div>
+      ${view === "tag-manager" && !visible.length ? `<div class="empty-state"><div><span>§</span><h3>No tag manager classified</h3><p>No observed service matched the current public tag-manager classification. GlassNet will not invent container details.</p></div></div>` : ""}
+    </section>`;
+  const draw = () => {
+    const query = document.querySelector("#inventory-search").value.toLowerCase();
+    document.querySelector("#inventory-body").innerHTML = inventoryRows(visible.filter((item) => JSON.stringify(item).toLowerCase().includes(query)));
+  };
+  document.querySelector("#inventory-search").addEventListener("input", draw);
+  document.querySelector("#edit-governance")?.addEventListener("click", () => editGovernanceRecord(visible));
+}
+
+function inventoryRows(items) {
+  return items.map((item, index) => `<tr><td><input type="radio" name="service-domain" value="${escapeHtml(item.domain)}" ${index === 0 ? "checked" : ""} aria-label="Select ${escapeHtml(item.service)}"></td><td><strong>${escapeHtml(item.service)}</strong><br><span class="domain">${escapeHtml(item.domain)}</span></td><td>${item.websites.length}</td><td>${escapeHtml(item.purpose)}</td><td>${escapeHtml(item.owner || "Unowned")}<br><span class="quiet-note">${escapeHtml(item.team || "No team")}</span></td><td><span class="badge ${item.approval_status === "approved" ? "pass" : "warn"}">${escapeHtml(item.approval_status)}</span></td><td>${escapeHtml(item.consent_requirement)}</td><td class="mono">${formatDate(item.first_seen)}<br>${formatDate(item.last_seen)}</td></tr>`).join("");
+}
+
+async function editGovernanceRecord(items) {
+  const domain = document.querySelector('input[name="service-domain"]:checked')?.value;
+  const current = items.find((item) => item.domain === domain);
+  if (!current) return showToast("Select a service");
+  const owner = prompt("Owner name", current.owner || "");
+  if (owner === null) return;
+  const team = prompt("Team", current.team || "");
+  if (team === null) return;
+  const approval = prompt("Approval: unreviewed, technical_review, privacy_review, approved, rejected, expired", current.approval_status || "unreviewed");
+  if (approval === null) return;
+  await api(`/api/governance/services/${encodeURIComponent(domain)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ owner, team, purpose: current.purpose, approval_status: approval, consent_requirement: current.consent_requirement, review_date: new Date().toISOString().slice(0, 10) }) });
+  showToast("Governance record updated");
+  renderInventory(location.pathname.split("/").at(-1));
+}
+
+async function renderApprovals() {
+  const approvals = await api("/api/governance/approvals");
+  workspace.innerHTML = `
+    <section class="page">
+      <div class="page-heading"><p class="eyebrow">GOVERN / CHANGE APPROVAL</p><h2>Privacy Change Approval Workflow</h2><p>Planned vendor, script, cookie, purpose, consent, storage, and policy changes receive accountable states before verification.</p></div>
+      <div class="workspace-grid equal">
+        <section class="repo-panel"><div class="panel-head"><h3>Approval queue</h3><span class="badge">${approvals.length} records</span></div><div>${approvals.map((item) => `<div class="issue-row"><span class="status-symbol ${item.status === "verified" ? "verified" : item.status === "rejected" ? "serious" : "attention"}"><span>${item.status === "verified" ? "✓" : "!"}</span></span><span><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.change_type)} · owner ${escapeHtml(item.owner)} · ${escapeHtml(item.expected_impact)}</p></span><select class="field" data-approval-state="${item.id}">${["draft","technical_review","privacy_review","approved","rejected","deployed","verified","rolled_back"].map((status) => `<option value="${status}" ${item.status === status ? "selected" : ""}>${status}</option>`).join("")}</select></div>`).join("") || `<div class="empty-state"><div><h3>No proposed changes</h3><p>Create a draft to begin accountable review.</p></div></div>`}</div></section>
+        <section class="repo-panel"><div class="panel-head"><h3>Draft change</h3></div><form id="approval-form" class="panel-body archive-form"><label>Change type<select class="field" name="change_type"><option>new vendor</option><option>new script</option><option>new cookie</option><option>consent change</option><option>service removal</option></select></label><label>Title<input class="field" name="title" required></label><label>Owner<input class="field" name="owner" required></label><label>Consent requirement<input class="field" name="consent_requirement" required value="review required"></label><label class="wide">Purpose<textarea class="field" name="purpose" required></textarea></label><label class="wide">Expected impact<textarea class="field" name="expected_impact" required></textarea></label><label class="wide">Evidence or design link<input class="field" name="evidence"></label><label><input type="checkbox" name="policy_update_required"> Policy update required</label><button class="button primary" type="submit">Create draft</button></form></section>
+      </div>
+    </section>`;
+  document.querySelector("#approval-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    await api("/api/governance/approvals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...values, policy_update_required: values.policy_update_required === "on" }) });
+    showToast("Approval draft created");
+    renderApprovals();
+  });
+  document.querySelectorAll("[data-approval-state]").forEach((select) => select.addEventListener("change", async () => {
+    await api(`/api/governance/approvals/${select.dataset.approvalState}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: select.value }) });
+    showToast("Approval state updated");
+  }));
+}
+
+async function renderDecisions() {
+  const decisions = await api("/api/governance/decisions");
+  workspace.innerHTML = `
+    <section class="page">
+      <div class="page-heading"><p class="eyebrow">GOVERN / ADR</p><h2>Privacy Architecture Decision Records</h2><p>Preserve the context, alternatives, impacts, owner, and replacement plan behind privacy-related architecture choices.</p></div>
+      <div class="workspace-grid equal">
+        <section class="repo-panel"><div class="panel-head"><h3>Decision archive</h3></div><div>${decisions.map((item) => `<article class="panel-body" style="border-bottom:1px solid var(--line)"><span class="evidence-label confirmed">Reviewer record</span><h3>${escapeHtml(item.title)}</h3><p class="quiet-note">${escapeHtml(item.context)}</p><div class="inspector-row"><span>Decision</span><strong>${escapeHtml(item.decision)}</strong></div><div class="inspector-row"><span>Owner</span><strong>${escapeHtml(item.owner)}</strong></div><div class="inspector-row"><span>Review</span><strong>${escapeHtml(item.review_date || "not scheduled")}</strong></div></article>`).join("") || `<div class="empty-state"><div><h3>No decision records</h3><p>Record why an approved architecture choice exists.</p></div></div>`}</div></section>
+        <section class="repo-panel"><div class="panel-head"><h3>New decision record</h3></div><form id="decision-form" class="panel-body archive-form"><label class="wide">Decision title<input class="field" name="title" required></label><label class="wide">Context<textarea class="field" name="context" required></textarea></label><label class="wide">Alternatives<textarea class="field" name="alternatives" required></textarea></label><label class="wide">Selected approach<textarea class="field" name="decision" required></textarea></label><label class="wide">Privacy impact<textarea class="field" name="privacy_impact" required></textarea></label><label>Owner<input class="field" name="owner" required></label><label>Review date<input class="field" type="date" name="review_date"></label><label>Related service<input class="field" name="related_domain"></label><label class="wide">Replacement plan<textarea class="field" name="replacement_plan"></textarea></label><button class="button primary" type="submit">Archive decision</button></form></section>
+      </div>
+    </section>`;
+  document.querySelector("#decision-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await api("/api/governance/decisions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
+    showToast("Decision record archived");
+    renderDecisions();
+  });
+}
+
+async function renderImprovement(section = "") {
+  setPage(section ? titleCase(section) : "Improve", `Improve${section ? ` / ${titleCase(section)}` : ""}`);
+  activeNavigation("improvement");
+  emptyInspector();
+  if (!section) {
+    workspace.innerHTML = workspaceIntro("IMPROVEMENT STUDIO", "Turn findings into architecture work.", "Analyze necessity, design a safer blueprint, explore substitutions, manage privacy debt, and measure process maturity.", [
+      { icon: "N", title: "Necessity Analyzer", copy: "Separate core, useful, optional, unnecessary, and unknown dependencies.", path: "/improvement/necessity" },
+      { icon: "B", title: "Architecture Blueprint", copy: "Compare observed architecture with an evidence-based proposed design.", path: "/improvement/blueprint" },
+      { icon: "S", title: "Vendor Substitution", copy: "Explore architectural choices without unverified vendor recommendations.", path: "/improvement/substitution" },
+      { icon: "D", title: "Privacy Debt Ledger", copy: "Prioritize problems by impact, age, effort, recurrence, and ownership.", path: "/improvement/debt" },
+      { icon: "M", title: "Maturity Model", copy: "See observable process levels and the next evidence-backed action.", path: "/improvement/maturity" },
+    ]);
+    return;
+  }
+  await loadScans().catch(() => []);
+  if (section === "debt") {
+    workspace.innerHTML = `<section class="page"><div class="page-heading"><p class="eyebrow">IMPROVE / DEBT</p><h2>Privacy Debt Ledger</h2><p>Findings become owned engineering work with impact and effort.</p></div><div id="global-debt"></div></section>`;
+    return renderDebtLedger(document.querySelector("#global-debt"), { id: state.scans[0]?.id });
+  }
+  const first = state.scans[0];
+  workspace.innerHTML = `
+    <section class="page">
+      <div class="spread page-heading" style="max-width:none"><div><p class="eyebrow">IMPROVE / ${escapeHtml(section)}</p><h2>${section === "necessity" ? "Third-Party Necessity Analyzer" : section === "blueprint" ? "Website Privacy Architecture Blueprint" : section === "substitution" ? "Vendor Substitution Explorer" : "Website Privacy Maturity Model"}</h2><p>Choose a completed case; every recommendation remains tied to captured evidence and stated limitations.</p></div><div class="row"><select class="field" id="improve-case">${scanOptions(state.scans, 0)}</select><button class="button primary" id="run-improve" ${first ? "" : "disabled"}>Analyze</button></div></div>
+      <div id="improve-result">${first ? `<div class="repo-panel"><div class="panel-body quiet-note">Select Analyze to load the latest case.</div></div>` : `<div class="empty-state"><div><h3>No completed cases</h3><p>Run a scan before opening this improvement system.</p></div></div>`}</div>
+    </section>`;
+  document.querySelector("#run-improve")?.addEventListener("click", async () => {
+    const scanId = document.querySelector("#improve-case").value;
+    const target = document.querySelector("#improve-result");
+    if (section === "necessity") target.innerHTML = necessitySurface(await api(`/api/analysis/necessity/${scanId}`));
+    if (section === "blueprint") target.innerHTML = blueprintSurface(await api(`/api/analysis/blueprint/${scanId}`));
+    if (section === "substitution") target.innerHTML = substitutionSurface(await api(`/api/analysis/necessity/${scanId}`));
+    if (section === "maturity") target.innerHTML = maturitySurface(await api(`/api/analysis/maturity/${scanId}`));
+  });
+}
+
+async function renderTesting(section = "") {
+  setPage(section ? titleCase(section) : "Test", `Test${section ? ` / ${titleCase(section)}` : ""}`);
+  activeNavigation("testing");
+  emptyInspector();
+  if (!section) {
+    workspace.innerHTML = workspaceIntro("ARCHITECTURE TEST LAB", "Test expectations before and after release.", "Detect configuration drift, forecast planned services, run requirements, and compare structural privacy architectures.", [
+      { icon: "R", title: "Requirement Test Suite", copy: "Run machine-testable expectations with passed, failed, or inconclusive evidence.", path: "/testing/requirements" },
+      { icon: "D", title: "Configuration Drift", copy: "Reconcile production observations with approved inventory and consent metadata.", path: "/testing/drift" },
+      { icon: "F", title: "Impact Forecast", copy: "Model a proposed integration, clearly labeled as a forecast.", path: "/testing/forecast" },
+      { icon: "A", title: "Architecture Comparison", copy: "Compare dependency design rather than tracker counts alone.", path: "/testing/architecture" },
+    ]);
+    return;
+  }
+  await loadScans().catch(() => []);
+  if (section === "requirements") return renderRequirementSuite();
+  if (section === "forecast") return renderForecasts();
+  if (section === "architecture") return renderArchitectureTest();
+  workspace.innerHTML = `
+    <section class="page"><div class="page-heading"><p class="eyebrow">TEST / DRIFT</p><h2>Privacy Configuration Drift Detector</h2><p>Compare observed production behavior with approved service governance records.</p></div><div class="row"><select class="field" id="drift-case">${scanOptions(state.scans, 0)}</select><button class="button primary" id="run-drift" ${state.scans.length ? "" : "disabled"}>Detect drift</button></div><div id="drift-result" style="margin-top:12px"></div></section>`;
+  document.querySelector("#run-drift")?.addEventListener("click", async () => {
+    const result = await api(`/api/analysis/drift/${document.querySelector("#drift-case").value}`);
+    document.querySelector("#drift-result").innerHTML = driftSurface(result);
+  });
+}
+
+function driftSurface(result) {
+  return `<section class="repo-panel"><div class="panel-head"><div><h3>Reconciliation result</h3><p>Case ${result.scan_id}</p></div><span class="badge ${result.status === "aligned" ? "pass" : "warn"}">${escapeHtml(result.status)}</span></div><div>${[
+    ["Active but not approved", result.active_not_approved],
+    ["Approved but not observed", result.approved_not_observed],
+    ["Consent classification conflict", result.consent_conflicts],
+  ].map(([label, items]) => `<div class="finding-row"><span class="status-symbol ${items.length ? "attention" : "verified"}"><span>${items.length ? "!" : "✓"}</span></span><span><h4>${label}</h4><p>${items.length ? items.map((item) => escapeHtml(item.domain || item.name)).join(", ") : "No mismatch observed"}</p></span><span class="badge">${items.length}</span></div>`).join("")}</div><div class="panel-body quiet-note">${result.limitations.map(escapeHtml).join(" · ")}</div></section>`;
+}
+
+async function renderRequirementSuite() {
+  const requirements = await api("/api/testing/requirements");
+  workspace.innerHTML = `
+    <section class="page"><div class="page-heading"><p class="eyebrow">TEST / REQUIREMENTS</p><h2>Privacy Requirement Test Suite</h2><p>Requirements return passed, failed, or inconclusive with the exact observable value used.</p></div>
+      <div class="workspace-grid equal"><section class="repo-panel"><div class="panel-head"><h3>Machine-testable requirements</h3></div><div>${requirements.map((item) => `<div class="finding-row"><span class="status-symbol unknown">?</span><span><h4>${escapeHtml(item.name)}</h4><p class="mono">${escapeHtml(item.rule_type)} ≤ ${escapeHtml(item.expected_value)}</p></span><span class="badge">${item.enabled ? "enabled" : "off"}</span></div>`).join("")}</div><div class="panel-body row"><select class="field" id="requirement-case" style="flex:1">${scanOptions(state.scans, 0)}</select><button class="button primary" id="run-requirements" ${state.scans.length ? "" : "disabled"}>Run suite</button></div></section>
+      <section class="repo-panel"><div class="panel-head"><h3>Add requirement</h3></div><form id="requirement-form" class="panel-body archive-form"><label class="wide">Name<input class="field" name="name" required></label><label>Evidence rule<select class="field" name="rule_type"><option value="unknown_domains">Unknown domains</option><option value="insecure_cookies">Insecure cookie attributes</option><option value="unowned_services">Unowned services</option><option value="advertising_services">Advertising services</option><option value="third_parties">Third parties</option><option value="storage_keys">Storage keys</option></select></label><label>Maximum allowed<input class="field" name="expected_value" type="number" min="0" value="0"></label><button class="button primary" type="submit">Add requirement</button></form></section></div>
+      <div id="requirement-results" style="margin-top:12px"></div></section>`;
+  document.querySelector("#run-requirements")?.addEventListener("click", async () => {
+    const result = await api(`/api/testing/requirements/${document.querySelector("#requirement-case").value}/run`);
+    document.querySelector("#requirement-results").innerHTML = `<section class="repo-panel"><div class="panel-head"><h3>Suite result</h3><span class="badge ${result.status === "passed" ? "pass" : result.status === "failed" ? "fail" : "warn"}">${result.status}</span></div>${result.results.map((item) => `<div class="finding-row"><span class="status-symbol ${item.status === "passed" ? "verified" : item.status === "failed" ? "serious" : "unknown"}"><span>${item.status === "passed" ? "✓" : item.status === "failed" ? "!" : "?"}</span></span><span><h4>${escapeHtml(item.name)}</h4><p>${escapeHtml(item.evidence)}</p></span><span class="badge">${escapeHtml(item.status)}</span></div>`).join("")}</section>`;
+  });
+  document.querySelector("#requirement-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await api("/api/testing/requirements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
+    showToast("Requirement added");
+    renderRequirementSuite();
+  });
+}
+
+async function renderForecasts() {
+  const forecasts = await api("/api/testing/forecasts");
+  workspace.innerHTML = `
+    <section class="page"><div class="page-heading"><p class="eyebrow">TEST / FORECAST</p><h2>Privacy Impact Forecast</h2><p>Model planned architecture before deployment. Every output is labeled as a forecast—not an observation.</p></div>
+      <div class="workspace-grid equal"><section class="repo-panel"><div class="panel-head"><h3>New forecast</h3></div><form id="forecast-form" class="panel-body archive-form"><label>Name<input class="field" name="name" required></label><label>Service category<input class="field" name="service_category" required></label><label class="wide">Expected domains<input class="field" name="domains" required placeholder="service.example, assets.example"></label><label>Expected scripts<input class="field" name="expected_scripts" type="number" min="0" value="1"></label><label>Cookie behavior<select class="field" name="cookie_behavior"><option value="none">None</option><option value="session">Session</option><option value="persistent">Persistent</option><option value="unknown">Unknown</option></select></label><label>Storage use<select class="field" name="storage_use"><option value="none">None</option><option value="local">Local storage</option><option value="session">Session storage</option><option value="unknown">Unknown</option></select></label><label>Consent requirement<input class="field" name="consent_requirement" value="review required"></label><label>Organization<input class="field" name="organization"></label><label class="wide">Page locations<input class="field" name="page_locations"></label><label class="wide">Data purpose<textarea class="field" name="data_purpose" required></textarea></label><button class="button primary" type="submit">Generate forecast</button></form></section>
+      <section class="repo-panel"><div class="panel-head"><h3>Forecast archive</h3></div><div id="forecast-list">${forecasts.map(forecastCard).join("") || `<div class="empty-state"><div><h3>No forecasts</h3><p>Model a planned service before it reaches production.</p></div></div>`}</div></section></div></section>`;
+  document.querySelector("#forecast-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const result = await api("/api/testing/forecasts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
+    document.querySelector("#forecast-list").insertAdjacentHTML("afterbegin", forecastCard({ name: event.currentTarget.name.value, service_category: event.currentTarget.service_category.value, forecast: result.forecast }));
+    showToast("Forecast archived");
+    event.currentTarget.reset();
+  });
+}
+
+function forecastCard(item) {
+  return `<article class="evidence-sheet" style="margin:12px"><span class="evidence-label inferred">Forecast — not observed</span><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.service_category)}</p>${Object.entries(item.forecast).filter(([key]) => !["label","uncertainty"].includes(key)).map(([key, value]) => `<div class="inspector-row"><span>${titleCase(key)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}<p class="quiet-note">${escapeHtml(item.forecast.uncertainty)}</p></article>`;
+}
+
+async function renderArchitectureTest() {
+  workspace.innerHTML = `<section class="page"><div class="page-heading"><p class="eyebrow">TEST / ARCHITECTURE</p><h2>Privacy Architecture Comparison</h2><p>Compare structural choices—directness, concentration, optionality, storage, and consent boundaries—not only counts.</p></div><div class="repo-panel"><div class="panel-body row"><select class="field" id="arch-left" style="flex:1">${scanOptions(state.scans, 0)}</select><select class="field" id="arch-right" style="flex:1">${scanOptions(state.scans, 1)}</select><button class="button primary" id="run-architecture" ${state.scans.length < 2 ? "disabled" : ""}>Compare architecture</button></div></div><div id="architecture-result" style="margin-top:12px"></div></section>`;
+  document.querySelector("#run-architecture")?.addEventListener("click", async () => {
+    const left = document.querySelector("#arch-left").value;
+    const right = document.querySelector("#arch-right").value;
+    if (left === right) return showToast("Choose two different cases");
+    const result = await api(`/api/analysis/architecture?left=${left}&right=${right}`);
+    const rows = ["direct_dependencies","first_party_requests","third_party_requests","dependency_depth","organization_concentration_proxy","optional_services","storage_footprint","consent_boundary"];
+    document.querySelector("#architecture-result").innerHTML = `<section class="repo-panel"><div class="panel-head"><h3>Architecture evidence</h3><span class="badge">CONTEXTUAL</span></div><div class="data-table-wrap" style="border:0"><table class="data-table"><thead><tr><th>Dimension</th><th>${escapeHtml(result.left.website)}</th><th>${escapeHtml(result.right.website)}</th></tr></thead><tbody>${rows.map((key) => `<tr><td>${titleCase(key)}</td><td>${escapeHtml(result.left[key])}</td><td>${escapeHtml(result.right[key])}</td></tr>`).join("")}</tbody></table></div><div class="panel-body quiet-note">${escapeHtml(result.context)}</div></section>`;
+  });
+}
+
+async function renderConsentCenter() {
+  setPage("Consent", "Studio / Consent");
+  activeNavigation("");
+  emptyInspector();
+  const evaluations = await api("/api/consent/evaluations");
+  await loadScans().catch(() => []);
+  workspace.innerHTML = `
+    <section class="page"><div class="page-heading"><p class="eyebrow">CONSENT / INTERFACE QUALITY</p><h2>Consent Interface Quality Evaluator</h2><p>Record observable interface qualities carefully. GlassNet reports balance and friction without declaring a dark pattern or legal violation.</p></div>
+      <div class="workspace-grid equal"><section class="repo-panel"><div class="panel-head"><h3>Structured evaluator</h3><span class="badge ai">REVIEWER INPUT</span></div><form id="consent-quality-form" class="panel-body archive-form"><label>Related case<select class="field" name="scan_id"><option value="">No case</option>${scanOptions(state.scans, -1)}</select></label><label>Steps to accept<input class="field" name="accept_steps" type="number" min="0" required value="1"></label><label>Steps to reject<input class="field" name="reject_steps" type="number" min="0" required value="1"></label><label><input type="checkbox" name="reject_visible"> Reject option clearly visible</label><label><input type="checkbox" name="granular"> Granular categories available</label><label><input type="checkbox" name="revisit_available"> Preferences can be revisited</label><label><input type="checkbox" name="default_selections"> Non-essential defaults selected</label><label class="wide">Reviewer note<textarea class="field" name="evaluator_note"></textarea></label><button class="button primary" type="submit">Evaluate interface</button></form></section>
+      <section class="repo-panel"><div class="panel-head"><h3>Evaluation archive</h3></div><div id="consent-evaluations">${evaluations.map((item) => `<div class="finding-row"><span class="status-symbol ${item.result === "Balanced" ? "verified" : item.result === "Result inconclusive" ? "unknown" : "attention"}"><span>${item.result === "Balanced" ? "✓" : "!"}</span></span><span><h4>${escapeHtml(item.result)}</h4><p>Accept ${item.accept_steps} step(s) · Reject ${item.reject_steps} step(s) · Reviewer record ${item.id}</p></span><span class="badge">${formatDate(item.created_at)}</span></div>`).join("") || `<div class="empty-state"><div><h3>No interface evaluations</h3><p>Record observable consent controls; do not guess absent evidence.</p></div></div>`}</div></section></div>
+      <section class="evidence-sheet" style="margin-top:12px"><span class="evidence-label observed">Network evidence</span><h3>Consent behavior remains separate</h3><p>The interface-quality evaluator records reviewer-observed usability. The existing Case evidence records technical requests, cookies, and consent-state limitations. Neither substitutes for the other.</p></section></section>`;
+  document.querySelector("#consent-quality-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    const result = await api("/api/consent/evaluations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scan_id: Number(values.scan_id) || undefined, accept_steps: Number(values.accept_steps), reject_steps: Number(values.reject_steps), reject_visible: values.reject_visible === "on", granular: values.granular === "on", revisit_available: values.revisit_available === "on", default_selections: values.default_selections === "on", evaluator_note: values.evaluator_note }) });
+    showToast(`Evaluation: ${result.result}`);
+    renderConsentCenter();
+  });
+}
+
+function renderStudio(section = "") {
+  if (section === "research") return renderResearch();
+  if (section === "integrations") return renderApi();
+  if (section === "settings") return renderSettings();
+  if (section === "consent") return renderConsentCenter();
+  setPage("Studio", "Studio");
+  activeNavigation("");
+  emptyInspector();
+  workspace.innerHTML = workspaceIntro("SECONDARY WORKSPACES", "Studio", "Research, consent, integrations, and settings are kept outside the six primary navigation entries.", [
+    { icon: "C", title: "Consent", copy: "Evaluate interface quality and open consent evidence.", path: "/consent" },
+    { icon: "R", title: "Research", copy: "Export reproducible case datasets and methodology.", path: "/studio/research" },
+    { icon: "I", title: "Integrations", copy: "Review local APIs, rules, and feature readiness.", path: "/studio/integrations" },
+    { icon: "S", title: "Settings", copy: "Appearance, density, account, and privacy boundaries.", path: "/settings" },
+  ]);
+}
+
 function attachGlobalActions() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => navigate(button.dataset.go)));
   document.querySelectorAll("[data-open-scan]").forEach((row) => {
-    row.addEventListener("click", () => navigate(`/investigations/${row.dataset.openScan}/overview`));
-    row.addEventListener("keydown", (event) => { if (event.key === "Enter") navigate(`/investigations/${row.dataset.openScan}/overview`); });
+    row.addEventListener("click", () => navigate(`/cases/${row.dataset.openScan}/summary`));
+    row.addEventListener("keydown", (event) => { if (event.key === "Enter") navigate(`/cases/${row.dataset.openScan}/summary`); });
   });
 }
 
@@ -1205,14 +1682,22 @@ async function renderRoute() {
     if (!root) renderLanding();
     else if (root === "home") await renderHome();
     else if (root === "scan") renderScan();
-    else if (root === "investigations" && parts[1]) await renderInvestigationRoute(parts[1], parts[2] || "overview");
-    else if (root === "investigations") await renderInvestigations();
-    else if (root === "compare") await renderCompare();
+    else if (root === "cases" && parts[1]) await renderInvestigationRoute(parts[1], parts[2] || "summary");
+    else if (root === "cases") await renderInvestigations();
+    else if (root === "governance") await renderGovernance(parts[1] || "");
+    else if (root === "improvement") await renderImprovement(parts[1] || "");
+    else if (root === "testing") await renderTesting(parts[1] || "");
+    else if (root === "consent") await renderConsentCenter();
+    else if (root === "studio") await renderStudio(parts[1] || "");
+    else if (root === "settings") await renderSettings();
+    else if (root === "investigations" && parts[1]) navigate(`/cases/${parts[1]}/summary`);
+    else if (root === "investigations") navigate("/cases");
+    else if (root === "compare") navigate("/testing/architecture");
     else if (root === "history") await renderHistory();
     else if (root === "reviews") await renderReviews();
     else if (root === "monitor") await renderMonitor();
     else if (root === "portfolio") await renderPortfolio();
-    else if (root === "workspace") await renderWorkspace(parts[1] || "");
+    else if (root === "workspace") navigate(`/studio/${parts[1] || ""}`.replace(/\/$/, ""));
     else navigate("/home");
   } catch (error) {
     workspace.innerHTML = `<section class="page"><div class="error-state"><h3>This workspace could not load</h3><p>${escapeHtml(error.message)}</p><button class="button primary" data-go="/home" style="margin-top:14px">Return home</button></div></section>`;
@@ -1253,6 +1738,7 @@ document.addEventListener("click", (event) => {
 window.addEventListener("popstate", renderRoute);
 document.querySelector("#theme-button").addEventListener("click", toggleTheme);
 document.querySelector("#help-button").addEventListener("click", () => document.querySelector("#help-dialog").showModal());
+document.querySelector("#studio-button").addEventListener("click", () => navigate("/studio"));
 document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
 setupCommandPalette();
 renderRoute();

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="GlassNet reveals the live network trail, privacy behavior, and third-party dependencies behind public websites.">
-  <meta name="theme-color" content="#091110">
-  <title>GlassNet — Website privacy observatory</title>
-  <link rel="stylesheet" href="/css/style.css?v=4">
-  <script src="/js/app.js?v=4" defer></script>
+  <meta name="theme-color" content="#171216">
+  <title>GlassNet — Obsidian Archive</title>
+  <link rel="stylesheet" href="/css/style.css?v=6">
+  <script src="/js/app.js?v=6" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#workspace">Skip to workspace</a>
@@ -21,10 +21,10 @@
       <nav class="rail-nav">
         <a href="/home" data-link data-nav="home"><span class="nav-glyph">⌂</span><span>Home</span></a>
         <a href="/scan" data-link data-nav="scan"><span class="nav-glyph">◎</span><span>Scan</span></a>
-        <a href="/investigations" data-link data-nav="investigations"><span class="nav-glyph">◫</span><span>Investigations</span></a>
-        <a href="/compare" data-link data-nav="compare"><span class="nav-glyph">⇄</span><span>Compare</span></a>
-        <a href="/monitor" data-link data-nav="monitor"><span class="nav-glyph">◉</span><span>Monitor</span></a>
-        <a href="/workspace" data-link data-nav="workspace"><span class="nav-glyph">⌘</span><span>Workspace</span></a>
+        <a href="/cases" data-link data-nav="cases"><span class="nav-glyph">▤</span><span>Cases</span></a>
+        <a href="/governance" data-link data-nav="governance"><span class="nav-glyph">§</span><span>Govern</span></a>
+        <a href="/improvement" data-link data-nav="improvement"><span class="nav-glyph">⌁</span><span>Improve</span></a>
+        <a href="/testing" data-link data-nav="testing"><span class="nav-glyph">✓</span><span>Test</span></a>
       </nav>
       <div class="rail-foot">
         <button id="theme-button" class="icon-button" aria-label="Change color theme">◐</button>
@@ -35,12 +35,12 @@
     <header class="workspace-header">
       <div>
         <p class="crumb" id="page-crumb">GlassNet / Home</p>
-        <h1 id="page-title">Network Observatory</h1>
+        <h1 id="page-title">Obsidian Archive</h1>
       </div>
       <div class="header-actions">
         <button class="command-trigger" id="command-trigger"><span>Search or run a command</span><kbd>Ctrl K</kbd></button>
-        <span class="scanner-state"><i></i><span>Scanner ready</span></span>
-        <button class="avatar" aria-label="Local workspace profile">LA</button>
+        <span class="scanner-state"><i>✓</i><span>Archive ready</span></span>
+        <button class="avatar" id="studio-button" aria-label="Open Studio workspace">ST</button>
       </div>
     </header>
 
@@ -51,9 +51,9 @@
   <nav class="mobile-nav" aria-label="Mobile navigation">
     <a href="/home" data-link data-nav="home">⌂<span>Home</span></a>
     <a href="/scan" data-link data-nav="scan">◎<span>Scan</span></a>
-    <a href="/investigations" data-link data-nav="investigations">◫<span>Cases</span></a>
-    <a href="/monitor" data-link data-nav="monitor">◉<span>Monitor</span></a>
-    <a href="/workspace" data-link data-nav="workspace">⌘<span>More</span></a>
+    <a href="/cases" data-link data-nav="cases">▤<span>Cases</span></a>
+    <a href="/governance" data-link data-nav="governance">§<span>Govern</span></a>
+    <a href="/studio" data-link>⌘<span>Studio</span></a>
   </nav>
 
   <dialog id="command-palette" class="command-palette">

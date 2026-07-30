@@ -1,13 +1,14 @@
 # GlassNet
 
-GlassNet is a local website intelligence and privacy observability platform. It
-captures a public website's network trail and turns it into an investigation:
-domains, services, safe cookie attributes, storage-key names, scripts, selected
-security headers, graph relationships, and normalized replay events.
+GlassNet is a local website privacy intelligence platform. Its **Obsidian
+Archive** interface captures a public website's observable network trail and
+organizes it as case evidence: domains, services, safe cookie attributes,
+storage-key names, scripts, selected security headers, graph relationships,
+and normalized replay events.
 
-## Run GlassNet on Windows
+## Run on Windows
 
-Open PowerShell inside the `glassnet` folder and use:
+Open PowerShell inside the `glassnet` folder:
 
 ```powershell
 npm.cmd install
@@ -15,60 +16,74 @@ npm.cmd run install-browser
 npm.cmd start
 ```
 
-Then open `http://127.0.0.1:5000`.
+Open `http://127.0.0.1:5000`.
 
-If PowerShell allows `npm`, the shorter `npm start` command works too. Using
-`npm.cmd` avoids the common PowerShell script-policy error.
+`npm.cmd` avoids the PowerShell execution-policy error that can affect
+`npm.ps1`. After the first installation, starting the app only requires:
 
-## Main workspaces
+```powershell
+npm.cmd start
+```
 
-- Home and Scan — launch Quick, Full, Consent, or Developer investigations.
-- Investigations — browse versioned snapshots and technical evidence.
-- Digital Twin — explore the website's captured dependency graph.
-- Data Flow Replay — step through normalized network events over time.
-- Consent Lab — review initial-state evidence without pretending a consent
-  action occurred.
-- Privacy Git History and Compare — inspect changes between snapshots.
-- Developer — privacy reviews, CI threshold checks, issues, and remediation.
-- Monitor and Portfolio — group websites and prepare ongoing observation.
-- Research — export safe datasets with reproducibility notes.
+## Archive workspaces
+
+- **Home** — recent cases, archive activity, and quick actions.
+- **Scan** — Quick, Full, Consent, and Developer investigations.
+- **Cases** — summary, dependency map, journeys, evidence, and actions.
+- **Govern** — service inventory, ownership, tag-manager records, approvals,
+  and architecture decision records.
+- **Improve** — necessity review, privacy blueprint, vendor substitution,
+  privacy debt, and maturity planning.
+- **Test** — requirements, configuration drift, impact forecasts, and
+  architecture comparison.
+- **Consent** — consent-interface quality records and evidence boundaries.
+- **Studio** — research exports, integrations, and local settings.
+
+The rebuild also includes feature-to-tracker attribution, data-exposure
+scenarios, evidence chains, incident reconstruction, journey mapping, and
+service governance. Calculated results distinguish observed evidence from
+classification, inference, recommendations, and user confirmation.
 
 ## Storage
 
 GlassNet uses Node's built-in SQLite support. The local database is
-`data/glassnet.sqlite`, which Git ignores. It stores separate relational tables
-for accounts, scans, jobs, baselines, reviews, issues, rules, portfolios,
-monitors, feedback, and audit events.
+`data/glassnet.sqlite`, which Git ignores. It stores scans and evidence
+separately from governance records, debt items, approvals, decisions,
+requirements, forecasts, journeys, and consent evaluations.
 
 ## Privacy and safety
 
 Every scan uses a fresh isolated browser context. GlassNet does not open a
 person's normal browser profile or copy their login state. It does not retain
-cookie values, storage values, passwords, form content, request bodies,
+cookie values, storage values, passwords, form contents, request bodies,
 authentication tokens, or response bodies. Private and local network targets
 are blocked.
 
+When the scanner did not observe enough evidence, the archive returns
+`inconclusive`; it does not invent a result.
+
 ## Main files
 
-- `server.ts` — Express routes and background scan orchestration.
-- `src/scanner.ts` — safe browser observation and normalized scan events.
-- `src/repository.ts` — SQLite queries for investigations and workflows.
+- `server.ts` — Express routes and scan orchestration.
+- `src/scanner.ts` — safe browser observation and normalized events.
+- `src/archive-analysis.ts` — small deterministic analysis helpers.
+- `src/repository.ts` — SQLite queries for cases and workflows.
 - `src/database.ts` — relational tables and local defaults.
 - `templates/index.html` — accessible application shell.
-- `static/css/style.css` — Network Repository Observatory visual system.
-- `static/js/app.js` — routes, workspaces, graph, replay, and interactions.
-- `docs/REBUILD_AUDIT.md` — audit, architecture, and implementation decisions.
+- `static/css/style.css` — Obsidian Archive visual system.
+- `static/js/app.js` — routes, workspaces, graph, forms, and interactions.
+- `docs/OBSIDIAN_ARCHIVE.md` — rebuild audit and feature map.
 
 ## Libraries
 
-- `express` — web server and JSON API.
+- `express` — local web server and JSON API.
 - `playwright` — fresh isolated scanning browser.
-- `tldts` — accurate registered-domain parsing.
+- `tldts` — registered-domain parsing.
 - `dotenv` — local environment settings.
 - `typescript` and `tsx` — TypeScript development runtime.
-- `cytoscape.js` — loaded only when the Digital Twin is opened.
+- `cytoscape.js` — loaded only when a dependency map is opened.
 
-## Useful checks
+## Checks
 
 ```powershell
 npm.cmd run typecheck
@@ -76,5 +91,5 @@ npm.cmd test
 npm.cmd run check-secrets
 ```
 
-The exposure score is a transparent estimate based on one observable page load.
-It is not a legal, compliance, or security verdict.
+The exposure score and forecasts are transparent estimates based on available
+evidence. They are not legal, compliance, or security verdicts.
