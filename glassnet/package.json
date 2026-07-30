@@ -3,21 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "tsx server.ts",
+    "prepare": "npm run build",
+    "start": "node dist/server.js",
+    "start:source": "tsx server.ts",
     "dev": "tsx watch server.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --outDir dist",
-    "test": "npm run build && node --test dist/tests/classification.test.js dist/tests/archive-analysis.test.js",
+    "test": "npm run build && node --test dist/tests/classification.test.js dist/tests/archive-analysis.test.js dist/tests/performance-budget.test.js",
     "check-secrets": "node scripts/secret-check.mjs",
     "install-browser": "playwright install chromium"
   },
   "dependencies": {
+    "compression": "^1.8.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "playwright": "^1.52.0",
     "tldts": "^6.1.86"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",

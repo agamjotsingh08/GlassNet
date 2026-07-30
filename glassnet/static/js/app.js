@@ -10,7 +10,21 @@ const state = {
   report: null,
   network: null,
   replayTimer: null,
+  liveSource: null,
+  pollTimer: null,
+  routeController: new AbortController(),
+  requestCache: new Map(),
+  inFlightRequests: new Map(),
+  reportCache: new Map(),
   density: localStorage.getItem("glassnet-density") || "comfortable",
+  performanceMode: localStorage.getItem("glassnet-performance") || "standard",
+  dataMode: localStorage.getItem("glassnet-data-mode") || "standard",
+};
+
+const cacheTimes = {
+  "/api/scans": 15000,
+  "/api/sample-report": 60000,
+  "/api/features": 60000,
 };
 
 const commands = [
@@ -27,6 +41,8 @@ const commands = [
 document.documentElement.dataset.theme =
   localStorage.getItem("glassnet-archive-theme") || "dark";
 document.documentElement.dataset.density = state.density;
+document.documentElement.dataset.performance = state.performanceMode;
+document.documentElement.dataset.dataMode = state.dataMode;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -42,11 +58,38 @@ function safeNumber(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
-async function api(url, options) {
-  const response = await fetch(url, options);
-  const body = response.status === 204 ? null : await response.json();
-  if (!response.ok) throw new Error(body?.error || "GlassNet could not complete this request.");
-  return body;
+async function api(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const isGet = method === "GET";
+  const cacheKey = isGet ? url : "";
+  const cacheTime = Object.entries(cacheTimes).find(([prefix]) => url.startsWith(prefix))?.[1] || (url.includes("/view/") ? 30000 : 0);
+  const cached = cacheTime ? state.requestCache.get(cacheKey) : null;
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (isGet && state.inFlightRequests.has(cacheKey)) return state.inFlightRequests.get(cacheKey);
+
+  const request = (async () => {
+    const response = await fetch(url, {
+      ...options,
+      signal: options.signal || (isGet ? state.routeController.signal : undefined),
+    });
+    const body = response.status === 204 ? null : await response.json();
+    if (!response.ok) throw new Error(body?.error || "GlassNet could not complete this request.");
+    if (cacheTime) state.requestCache.set(cacheKey, { value: body, expiresAt: Date.now() + cacheTime });
+    return body;
+  })();
+
+  if (isGet) state.inFlightRequests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (isGet && state.inFlightRequests.get(cacheKey) === request) state.inFlightRequests.delete(cacheKey);
+  }
+}
+
+function clearCachedRequests(prefix) {
+  for (const key of state.requestCache.keys()) {
+    if (key.startsWith(prefix)) state.requestCache.delete(key);
+  }
 }
 
 function showToast(message) {
@@ -185,7 +228,8 @@ function modeTile(value, icon, title, description, selected = false) {
 }
 
 async function loadScans() {
-  state.scans = await api("/api/scans");
+  const page = await api(`/api/scans?limit=${state.dataMode === "reduced" ? 15 : 30}`);
+  state.scans = Array.isArray(page) ? page : page.items;
   return state.scans;
 }
 
@@ -308,7 +352,7 @@ async function startScan(event) {
     });
     localStorage.removeItem("glassnet-unsent-url");
     renderLiveScan(job, url, mode);
-    pollJob(job.jobId);
+    watchJob(job.jobId);
   } catch (error) {
     showScanError(error.message);
   }
@@ -343,22 +387,51 @@ function renderLiveScan(job, url, mode) {
     </section>`;
 }
 
-async function pollJob(jobId) {
+function finishLiveJob(job) {
+  state.liveSource?.close();
+  state.liveSource = null;
+  clearTimeout(state.pollTimer);
+  state.pollTimer = null;
+  if (job.status === "completed") {
+    clearCachedRequests("/api/scans");
+    state.reportCache.clear();
+    showToast("Case archived");
+    navigate(`/cases/${job.scan_id}/summary`);
+    return true;
+  }
+  if (job.status === "failed") {
+    showScanError(job.error_code || "The browser worker could not finish this scan.", job.scan_id);
+    return true;
+  }
+  return false;
+}
+
+function watchJob(jobId) {
+  if (!("EventSource" in window)) return pollJob(jobId);
+  state.liveSource?.close();
+  const source = new EventSource(`/api/jobs/${jobId}/events`);
+  state.liveSource = source;
+  source.onmessage = (event) => updateLiveProgress(JSON.parse(event.data));
+  source.addEventListener("complete", (event) => finishLiveJob(JSON.parse(event.data)));
+  source.onerror = () => {
+    if (source.readyState === EventSource.CLOSED && state.liveSource === source) {
+      state.liveSource = null;
+      pollJob(jobId);
+    }
+  };
+}
+
+async function pollJob(jobId, delay = 900, previousStage = "") {
   try {
     const job = await api(`/api/jobs/${jobId}`);
     updateLiveProgress(job);
-    if (job.status === "completed" && job.report) {
-      state.report = job.report;
-      showToast("Case archived");
-      navigate(`/cases/${job.scan_id}/summary`);
-      return;
-    }
-    if (job.status === "failed") {
-      showScanError(job.error_code || "The browser worker could not finish this scan.", job.scan_id);
-      return;
-    }
-    setTimeout(() => pollJob(jobId), 700);
+    if (finishLiveJob(job)) return;
+    const currentStage = job.progress?.stage || job.progress_stage || "";
+    const nextDelay = currentStage === previousStage ? Math.min(2200, delay + 250) : 900;
+    const visibleDelay = document.hidden ? Math.max(2500, nextDelay) : nextDelay;
+    state.pollTimer = setTimeout(() => pollJob(jobId, nextDelay, currentStage), visibleDelay);
   } catch (error) {
+    if (error.name === "AbortError") return;
     showScanError(error.message);
   }
 }
@@ -394,6 +467,7 @@ function showScanError(message, scanId = "local") {
 
 async function openSample() {
   state.report = await api("/api/sample-report");
+  state.reportCache.set("sample:full", state.report);
   renderInvestigation(state.report, "summary");
   history.replaceState({}, "", "/cases/sample/summary");
 }
@@ -441,18 +515,22 @@ function filterInvestigations() {
   attachGlobalActions();
 }
 
-async function getReport(scanId) {
+async function getReport(scanId, tab = "summary", full = false) {
   if (scanId === "sample") return api("/api/sample-report");
-  if (state.report?.id === Number(scanId)) return state.report;
-  return api(`/api/scans/${scanId}`);
+  const key = `${scanId}:${full ? "full" : tab}`;
+  if (state.reportCache.has(key)) return state.reportCache.get(key);
+  const report = await api(full ? `/api/scans/${scanId}` : `/api/scans/${scanId}/view/${tab}`);
+  state.reportCache.set(key, report);
+  return report;
 }
 
 async function renderInvestigationRoute(scanId, tab = "summary") {
   try {
-    const report = await getReport(scanId);
+    const report = await getReport(scanId, tab);
     state.report = report;
     renderInvestigation(report, tab);
   } catch (error) {
+    if (error.name === "AbortError") return;
     showScanError(error.message, scanId);
   }
 }
@@ -481,7 +559,10 @@ function renderInvestigation(report, tab) {
       <div id="investigation-content">${investigationContent(report, tab)}</div>
     </section>`;
 
-  document.querySelector("#export-report").addEventListener("click", () => downloadJson(report, `glassnet-${report.target_domain}-${scanId}.json`));
+  document.querySelector("#export-report").addEventListener("click", async () => {
+    const exportReport = report.id ? await getReport(report.id, tab, true) : report;
+    downloadJson(exportReport, `glassnet-${report.target_domain}-${scanId}.json`);
+  });
   document.querySelector("#set-baseline")?.addEventListener("click", () => createBaseline(report.id));
   document.querySelectorAll("[data-investigation-tab]").forEach((button) => {
     button.addEventListener("click", () => navigate(`/cases/${scanId}/${button.dataset.investigationTab}`));
@@ -874,7 +955,8 @@ function evidenceView(report) {
   return `
     <div class="evidence-sheet" style="margin-bottom:12px"><span class="evidence-label observed">Observed</span> <span class="evidence-label classified">Classified</span> <span class="evidence-label inferred">Inferred</span> <span class="evidence-label recommended">Recommended</span> <span class="evidence-label confirmed">Confirmed by reviewer</span><p class="quiet-note">This surface separates captured technical facts from classification, interpretation, recommendations, and human confirmation.</p></div>
     <div class="table-tools"><input class="field" id="evidence-search" placeholder="Search evidence" style="flex:1"><select class="field" id="evidence-filter"><option value="">All evidence</option><option value="header">Headers</option><option value="cookie">Cookies</option><option value="script">Scripts</option><option value="localStorage">Local storage</option></select><button class="button ghost" id="export-evidence">Export</button></div>
-    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Type</th><th>Source</th><th>Observed metadata</th></tr></thead><tbody id="evidence-body">${evidenceTableRows(evidenceRows)}</tbody></table></div>
+    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Type</th><th>Source</th><th>Observed metadata</th></tr></thead><tbody id="evidence-body">${evidenceTableRows(evidenceRows.slice(0, 50))}</tbody></table></div>
+    <div class="panel-body spread"><span id="evidence-count" class="quiet-note">Showing ${Math.min(50, evidenceRows.length)} of ${evidenceRows.length}</span><button class="button ghost" id="evidence-more" ${evidenceRows.length > 50 ? "" : "hidden"}>Load 50 more</button></div>
     <div class="evidence-sheet" style="margin-top:12px"><span class="evidence-label observed">Methodology</span><h3>Limitations and reproducibility</h3><ul class="quiet-note" style="line-height:1.8">${report.limitations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><div class="inspector-row"><span>Scanner version</span><strong class="mono">${escapeHtml(report.scanner_version)}</strong></div><div class="inspector-row"><span>Mode</span><strong>${escapeHtml(report.mode || "full")}</strong></div></div>`;
 }
 
@@ -892,44 +974,29 @@ function attachInvestigationActions(report, tab) {
   if (tab === "actions") setupCaseActions(report);
 }
 
-async function loadCytoscape() {
-  if (window.cytoscape) return;
-  await new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js";
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("The graph library could not load. The text view remains available."));
-    document.head.appendChild(script);
-  });
-}
-
-async function setupDigitalTwin(report) {
-  try {
-    await loadCytoscape();
-    state.network?.destroy();
-    state.network = cytoscape({
-      container: document.querySelector("#network-graph"),
-      elements: [...report.graph.nodes, ...report.graph.edges],
-      layout: { name: "concentric", padding: 58, minNodeSpacing: 55, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches },
-      style: [
-        { selector: "node", style: { label: "data(label)", color: "#e4d5bf", "font-family": "Cascadia Code", "font-size": 9, "text-valign": "bottom", "text-margin-y": 9, "text-wrap": "wrap", "text-max-width": 84, width: 34, height: 34, "background-color": "#8f4d79", "border-width": 2, "border-color": "#b87745" } },
-        { selector: 'node[kind = "website"]', style: { shape: "hexagon", width: 72, height: 72, "background-color": "#f3eadc", "border-color": "#b87745", color: "#f3eadc", "font-size": 11 } },
-        { selector: 'node[kind = "Advertising"]', style: { shape: "diamond", "background-color": "#a9434d", "border-color": "#d88a80" } },
-        { selector: 'node[kind = "Analytics"]', style: { shape: "diamond", "background-color": "#d29b55", "border-color": "#ead0a0" } },
-        { selector: 'node[kind = "Unknown"]', style: { "background-color": "#30242e", "border-style": "dashed", "border-color": "#9d918a" } },
-        { selector: "edge", style: { width: 1.3, "line-color": "#773445", "target-arrow-color": "#b87745", "target-arrow-shape": "triangle", "curve-style": "bezier", opacity: .78 } },
-        { selector: ":selected", style: { "border-width": 4, "border-color": "#f3eadc", "line-color": "#d29b55", "target-arrow-color": "#d29b55" } },
-      ],
-    });
-    state.network.on("tap", "node", (event) => {
-      const data = event.target.data();
-      const service = data.details;
-      showInspector(data.label, data.id, [
-        ["Category", service?.category || "Website"],
-        ["Requests", String(service?.requests || report.summary.requests)],
-        ["Confidence", service?.confidence || "captured"],
-        ["Resource types", service?.types?.join(", ") || "document"],
-      ], service?.explanation || "The central website node.");
+async function setupDigitalTwin(report, forceGraph = false) {
+  const graphContainer = document.querySelector("#network-graph");
+  const graphToolbar = document.querySelector(".graph-toolbar");
+  const deferGraph = !forceGraph && (matchMedia("(max-width: 680px)").matches || state.dataMode === "reduced");
+  if (deferGraph) {
+    graphToolbar.hidden = true;
+    graphContainer.innerHTML = `<div class="empty-state"><div><span>⌁</span><h3>Simplified map mode</h3><p>The accessible dependency list is ready. Load the interactive graph only when you need it.</p><button class="button primary" id="load-interactive-graph">Load interactive graph</button></div></div>`;
+    document.querySelector("#load-interactive-graph").addEventListener("click", () => setupDigitalTwin(report, true), { once: true });
+  } else try {
+    graphToolbar.hidden = false;
+    const { createCaseGraph } = await import("/js/graph.js?v=1");
+    state.network = await createCaseGraph({
+      report,
+      container: graphContainer,
+      onSelect: (data) => {
+        const service = data.details;
+        showInspector(data.label, data.id, [
+          ["Category", service?.category || "Website"],
+          ["Requests", String(service?.requests || report.summary.requests)],
+          ["Confidence", service?.confidence || "captured"],
+          ["Resource types", service?.types?.join(", ") || "document"],
+        ], service?.explanation || "The central website node.");
+      },
     });
     document.querySelector("#graph-fit").addEventListener("click", () => state.network.fit(undefined, 55));
     document.querySelector("#graph-labels").addEventListener("click", (event) => {
@@ -947,7 +1014,7 @@ async function setupDigitalTwin(report) {
     document.querySelector("#network-graph").innerHTML = `<div class="empty-state"><div><span>⌁</span><h3>Graph unavailable</h3><p>${escapeHtml(error.message)}</p></div></div>`;
   }
 
-  document.querySelector("#blocking-service").addEventListener("change", (event) => {
+  if (!forceGraph) document.querySelector("#blocking-service").addEventListener("change", (event) => {
     const service = report.services.find((item) => item.domain === event.target.value);
     const output = document.querySelector("#blocking-result");
     if (!service) {
@@ -1011,14 +1078,27 @@ function setupEvidence(report) {
     ...report.storage.map((item) => ({ type: item.type, source: item.origin, detail: `key: ${item.key}` })),
     ...report.scripts.map((script) => ({ type: "script", source: script, detail: script })),
   ];
+  let visibleRows = 50;
+  let filterTimer;
   const applyFilters = () => {
     const query = document.querySelector("#evidence-search").value.toLowerCase();
     const type = document.querySelector("#evidence-filter").value;
     const filtered = allRows.filter((row) => (!type || row.type === type) && `${row.source} ${row.detail}`.toLowerCase().includes(query));
-    document.querySelector("#evidence-body").innerHTML = evidenceTableRows(filtered);
+    const shown = filtered.slice(0, visibleRows);
+    document.querySelector("#evidence-body").innerHTML = evidenceTableRows(shown);
+    document.querySelector("#evidence-count").textContent = `Showing ${shown.length} of ${filtered.length}`;
+    document.querySelector("#evidence-more").hidden = shown.length >= filtered.length;
   };
-  document.querySelector("#evidence-search").addEventListener("input", applyFilters);
+  document.querySelector("#evidence-search").addEventListener("input", () => {
+    clearTimeout(filterTimer);
+    visibleRows = 50;
+    filterTimer = setTimeout(applyFilters, 180);
+  });
   document.querySelector("#evidence-filter").addEventListener("change", applyFilters);
+  document.querySelector("#evidence-more").addEventListener("click", () => {
+    visibleRows += 50;
+    applyFilters();
+  });
   document.querySelector("#export-evidence").addEventListener("click", () => downloadJson({ scan_id: report.id, scanner_version: report.scanner_version, limitations: report.limitations, evidence: allRows }, `glassnet-evidence-${report.target_domain}.json`));
 }
 
@@ -1343,13 +1423,15 @@ async function renderSettings() {
     <section class="page">
       <div class="page-heading"><p class="eyebrow">LOCAL PREFERENCES</p><h2>Settings</h2><p>Appearance and accounts remain on this device unless you deliberately connect an external service.</p></div>
       <div class="workspace-grid equal">
-        <section class="repo-panel"><div class="panel-head"><h3>Appearance</h3></div><div class="panel-body stack"><button class="button secondary spread" id="settings-theme"><span>Color theme</span><span>${document.documentElement.dataset.theme}</span></button><button class="button secondary spread" id="settings-density"><span>Information density</span><span>${state.density}</span></button></div></section>
+        <section class="repo-panel"><div class="panel-head"><h3>Appearance and performance</h3></div><div class="panel-body stack"><button class="button secondary spread" id="settings-theme"><span>Color theme</span><span>${document.documentElement.dataset.theme}</span></button><button class="button secondary spread" id="settings-density"><span>Information density</span><span>${state.density}</span></button><button class="button secondary spread" id="settings-performance"><span>Device mode</span><span>${state.performanceMode}</span></button><button class="button secondary spread" id="settings-data"><span>Data usage</span><span>${state.dataMode}</span></button></div></section>
         <section class="repo-panel"><div class="panel-head"><h3>Local account</h3></div><div class="panel-body">${account.user ? `<p>Signed in as <strong>${escapeHtml(account.user.email)}</strong>.</p><button class="button danger" id="logout">Sign out</button>` : `<form id="login-form" class="stack"><input class="field" id="login-email" type="email" placeholder="Email" required><input class="field" id="login-password" type="password" placeholder="Password (8+ characters)" minlength="8" required><div class="row"><button class="button primary" type="submit" name="action" value="login">Sign in</button><button class="button secondary" type="submit" name="action" value="register">Create account</button></div></form>`}</div></section>
       </div>
       <section class="repo-panel" style="margin-top:12px"><div class="panel-head"><h3>Privacy boundaries</h3></div><div class="panel-body quiet-note" style="line-height:1.8">GlassNet scans public targets in a fresh isolated browser. It does not access your normal browser profile, export authentication cookies, read passwords, or copy personal sessions. The SQLite database stays inside this project directory.</div></section>
     </section>`;
   document.querySelector("#settings-theme").addEventListener("click", toggleTheme);
   document.querySelector("#settings-density").addEventListener("click", toggleDensity);
+  document.querySelector("#settings-performance").addEventListener("click", togglePerformance);
+  document.querySelector("#settings-data").addEventListener("click", toggleDataMode);
   document.querySelector("#logout")?.addEventListener("click", async () => { await api("/api/auth/logout", { method: "POST" }); showToast("Signed out"); renderSettings(); });
   document.querySelector("#login-form")?.addEventListener("submit", handleAccount);
 }
@@ -1379,6 +1461,23 @@ function toggleDensity() {
   document.documentElement.dataset.density = state.density;
   localStorage.setItem("glassnet-density", state.density);
   showToast(`${titleCase(state.density)} density selected`);
+}
+
+function togglePerformance() {
+  state.performanceMode = state.performanceMode === "low" ? "standard" : "low";
+  document.documentElement.dataset.performance = state.performanceMode;
+  localStorage.setItem("glassnet-performance", state.performanceMode);
+  showToast(`${titleCase(state.performanceMode)} device mode selected`);
+  renderSettings();
+}
+
+function toggleDataMode() {
+  state.dataMode = state.dataMode === "reduced" ? "standard" : "reduced";
+  document.documentElement.dataset.dataMode = state.dataMode;
+  localStorage.setItem("glassnet-data-mode", state.dataMode);
+  clearCachedRequests("/api/scans");
+  showToast(`${titleCase(state.dataMode)} data mode selected`);
+  renderSettings();
 }
 
 function downloadJson(data, filename) {
@@ -1674,8 +1773,16 @@ function attachGlobalActions() {
 }
 
 async function renderRoute() {
+  state.routeController.abort();
+  state.routeController = new AbortController();
+  state.liveSource?.close();
+  state.liveSource = null;
+  clearTimeout(state.pollTimer);
+  state.pollTimer = null;
   clearInterval(state.replayTimer);
   state.replayTimer = null;
+  state.network?.destroy();
+  state.network = null;
   const parts = location.pathname.split("/").filter(Boolean);
   const root = parts[0] || "";
   try {
@@ -1700,6 +1807,7 @@ async function renderRoute() {
     else if (root === "workspace") navigate(`/studio/${parts[1] || ""}`.replace(/\/$/, ""));
     else navigate("/home");
   } catch (error) {
+    if (error.name === "AbortError") return;
     workspace.innerHTML = `<section class="page"><div class="error-state"><h3>This workspace could not load</h3><p>${escapeHtml(error.message)}</p><button class="button primary" data-go="/home" style="margin-top:14px">Return home</button></div></section>`;
   }
   attachGlobalActions();

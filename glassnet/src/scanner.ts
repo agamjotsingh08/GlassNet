@@ -1,7 +1,7 @@
 // GlassNet observes public browser metadata in a fresh isolated profile.
 // It never stores cookie values, request bodies, form fields, or login sessions.
-import { chromium } from "playwright";
 import { config } from "./config.js";
+import { createIsolatedContext } from "./browser-pool.js";
 import { classify, mainDomain, scoreLabel } from "./classification.js";
 import { isSafeRequestUrl } from "./url-safety.js";
 import type { CookieInfo, ScanEvent, ScanMode, ScanResult, StorageInfo } from "./types.js";
@@ -34,21 +34,11 @@ export async function scanPublicWebsite(
     });
   };
 
-  let browser;
-  try {
-    browser = await chromium.launch({ headless: true });
-  } catch {
-    try {
-      browser = await chromium.launch({ channel: "chrome", headless: true });
-    } catch {
-      throw new Error("GlassNet could not start an isolated browser. Windows or security software may be blocking browser automation.");
-    }
-  }
-
-  const context = await browser.newContext({
+  const browserLease = await createIsolatedContext({
     viewport: { width: 1360, height: 800 },
     acceptDownloads: false,
   });
+  const context = browserLease.context;
   const page = await context.newPage();
   let title = targetDomain;
   let cookies: CookieInfo[] = [];
@@ -119,16 +109,16 @@ export async function scanPublicWebsite(
     }
 
     if (mode !== "quick") {
-      storage = await page.evaluate(() => {
+      storage = await page.evaluate((maximumKeys) => {
         const values: StorageInfo[] = [];
-        for (let index = 0; index < localStorage.length; index += 1) {
+        for (let index = 0; index < localStorage.length && values.length < maximumKeys; index += 1) {
           values.push({ type: "localStorage", origin: location.origin, key: localStorage.key(index) || "" });
         }
-        for (let index = 0; index < sessionStorage.length; index += 1) {
+        for (let index = 0; index < sessionStorage.length && values.length < maximumKeys; index += 1) {
           values.push({ type: "sessionStorage", origin: location.origin, key: sessionStorage.key(index) || "" });
         }
         return values;
-      });
+      }, config.maxStorageKeys);
       for (const item of storage) addEvent("storage", targetDomain, targetDomain, item.type);
 
       scripts = await page.locator("script[src]").evaluateAll(
@@ -143,8 +133,7 @@ export async function scanPublicWebsite(
       }
     }
   } finally {
-    await context.close();
-    await browser.close();
+    await browserLease.release();
   }
 
   onProgress?.({ stage: "classifying_services", domains: domains.size, requests: liveRequests });

@@ -153,6 +153,7 @@ db.exec(`
   ) STRICT;
   CREATE INDEX IF NOT EXISTS scans_website_created ON scans(website_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS scans_user_created ON scans(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS scans_status_created ON scans(status, created_at DESC);
   CREATE INDEX IF NOT EXISTS scan_jobs_status ON scan_jobs(status, updated_at);
   CREATE INDEX IF NOT EXISTS watch_next_check ON watch_targets(next_check_at);
   CREATE INDEX IF NOT EXISTS issues_status ON issues(status, updated_at DESC);

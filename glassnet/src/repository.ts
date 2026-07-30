@@ -17,7 +17,7 @@ function websiteId(url: string, title?: string): number {
 export function createScan(url: string, userId?: number): { scanId: number; jobId: number } {
   const time = now();
   const siteId = websiteId(url);
-  const result = db.prepare("INSERT INTO scans (website_id, user_id, status, scanner_version, created_at) VALUES (?, ?, 'created', '0.4.0-local', ?)").run(siteId, userId || null, time);
+  const result = db.prepare("INSERT INTO scans (website_id, user_id, status, scanner_version, created_at) VALUES (?, ?, 'created', '0.5.0-local', ?)").run(siteId, userId || null, time);
   const scanId = Number(result.lastInsertRowid);
   const job = db.prepare("INSERT INTO scan_jobs (scan_id, status, progress_stage, created_at, updated_at) VALUES (?, 'queued', 'queued', ?, ?)").run(scanId, time, time);
   return { scanId, jobId: Number(job.lastInsertRowid) };
@@ -48,9 +48,69 @@ export function listReports(): ScanResult[] {
   return rows.map((row) => ({ ...JSON.parse(String(row.report_json)), id: Number(row.id), created_at: String(row.created_at) }));
 }
 
+export function listReportSummaries(limit = 20, before = "") {
+  const pageSize = Math.min(50, Math.max(1, Math.floor(limit)));
+  const rows = db.prepare(`
+    SELECT scans.id, scans.created_at, scans.request_count AS requests,
+      scans.cookie_count AS cookies, websites.title AS site_name,
+      websites.registered_domain AS target_domain,
+      json_extract(scans.report_json, '$.mode') AS mode,
+      json_extract(scans.report_json, '$.score') AS score,
+      json_extract(scans.report_json, '$.summary.third_parties') AS third_parties
+    FROM scans
+    JOIN websites ON websites.id = scans.website_id
+    WHERE scans.status = 'completed' AND (? = '' OR scans.created_at < ?)
+    ORDER BY scans.created_at DESC
+    LIMIT ?
+  `).all(before, before, pageSize + 1) as Row[];
+
+  const hasMore = rows.length > pageSize;
+  const page = rows.slice(0, pageSize).map((row) => ({
+    ...row,
+    id: Number(row.id),
+    requests: Number(row.requests),
+    cookies: Number(row.cookies),
+    score: Number(row.score),
+    third_parties: Number(row.third_parties),
+  }));
+  return {
+    items: page,
+    next_cursor: hasMore ? String(rows[pageSize - 1]?.created_at || "") : null,
+  };
+}
+
 export function findReport(id: number): ScanResult | undefined {
   const row = db.prepare("SELECT id, report_json, created_at FROM scans WHERE id=? AND status='completed'").get(id) as Row | undefined;
   return row ? { ...JSON.parse(String(row.report_json)), id: Number(row.id), created_at: String(row.created_at) } : undefined;
+}
+
+export function reportView(id: number, view: "summary" | "map" | "journeys" | "evidence" | "actions") {
+  const report = findReport(id);
+  if (!report) return undefined;
+  const headerPresence = Object.fromEntries(Object.keys(report.security_headers).map((name) => [name, "observed"]));
+  const common = {
+    id: report.id,
+    created_at: report.created_at,
+    status: report.status,
+    mode: report.mode,
+    scanner_version: report.scanner_version,
+    url: report.url,
+    site_name: report.site_name,
+    target_domain: report.target_domain,
+    score: report.score,
+    score_label: report.score_label,
+    notice: report.notice,
+    limitations: report.limitations,
+    summary: report.summary,
+    categories: report.categories,
+    consent: report.consent,
+  };
+
+  if (view === "map") return { ...common, services: report.services, first_party: report.first_party, graph: report.graph };
+  if (view === "journeys") return { ...common, services: report.services, events: report.events };
+  if (view === "evidence") return { ...common, cookies: report.cookies, storage: report.storage, scripts: report.scripts, security_headers: report.security_headers };
+  if (view === "actions") return { ...common, services: report.services, cookies: report.cookies, security_headers: headerPresence };
+  return { ...common, services: report.services, cookies: report.cookies, security_headers: headerPresence };
 }
 
 export function jobStatus(id: number) { return db.prepare("SELECT id, scan_id, status, progress_stage, attempts, error_code, updated_at FROM scan_jobs WHERE id=?").get(id); }
@@ -374,7 +434,7 @@ export function configurationDrift(scanId: number) {
 }
 
 export function listDebt() {
-  return db.prepare("SELECT * FROM privacy_debt_items ORDER BY CASE impact WHEN 'serious' THEN 1 WHEN 'high' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END, created_at ASC").all();
+  return db.prepare("SELECT * FROM privacy_debt_items ORDER BY CASE impact WHEN 'serious' THEN 1 WHEN 'high' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END, created_at ASC LIMIT 100").all();
 }
 
 export function createDebt(input: { scanId?: number; domain?: string; title: string; category: string; impact: string; complexity: string; effortHours?: number; owner?: string; evidence: string }) {
@@ -395,7 +455,7 @@ export function updateDebt(id: number, status: string) {
   return db.prepare("SELECT * FROM privacy_debt_items WHERE id=?").get(id);
 }
 
-export function listApprovals() { return db.prepare("SELECT * FROM change_approvals ORDER BY updated_at DESC").all(); }
+export function listApprovals() { return db.prepare("SELECT * FROM change_approvals ORDER BY updated_at DESC LIMIT 100").all(); }
 export function createApproval(input: { changeType: string; title: string; purpose: string; owner: string; expectedImpact: string; consentRequirement: string; policyUpdateRequired?: boolean; evidence?: string }) {
   if (![input.title, input.purpose, input.owner, input.expectedImpact].every((value) => value?.trim())) throw new Error("Title, purpose, owner, and impact are required.");
   const time = now();
@@ -413,7 +473,7 @@ export function updateApproval(id: number, status: string) {
   return db.prepare("SELECT * FROM change_approvals WHERE id=?").get(id);
 }
 
-export function listDecisions() { return db.prepare("SELECT * FROM architecture_decisions ORDER BY updated_at DESC").all(); }
+export function listDecisions() { return db.prepare("SELECT * FROM architecture_decisions ORDER BY updated_at DESC LIMIT 100").all(); }
 export function createDecision(input: { title: string; context: string; alternatives: string; decision: string; privacyImpact: string; consentImpact?: string; performanceImpact?: string; owner: string; reviewDate?: string; relatedDomain?: string; relatedScanId?: number; replacementPlan?: string }) {
   if (![input.title, input.context, input.alternatives, input.decision, input.privacyImpact, input.owner].every((value) => value?.trim())) throw new Error("Complete the required decision fields.");
   const time = now();
@@ -456,7 +516,7 @@ export function evaluateRequirements(scanId: number) {
   return { scan_id: scanId, status: results.some((item) => item.status === "failed") ? "failed" : results.some((item) => item.status === "inconclusive") ? "inconclusive" : "passed", results };
 }
 
-export function listForecasts() { return (db.prepare("SELECT * FROM impact_forecasts ORDER BY created_at DESC").all() as Row[]).map((row) => ({ ...row, forecast: JSON.parse(String(row.forecast_json)) })); }
+export function listForecasts() { return (db.prepare("SELECT * FROM impact_forecasts ORDER BY created_at DESC LIMIT 100").all() as Row[]).map((row) => ({ ...row, forecast: JSON.parse(String(row.forecast_json)) })); }
 export function createForecast(input: { name: string; serviceCategory: string; domains: string; expectedScripts?: number; cookieBehavior: string; storageUse: string; consentRequirement: string; pageLocations?: string; organization?: string; dataPurpose: string }) {
   if (![input.name, input.serviceCategory, input.domains, input.dataPurpose].every((value) => value?.trim())) throw new Error("Name, category, domains, and data purpose are required.");
   const domainCount = input.domains.split(/[\s,]+/).filter(Boolean).length;
@@ -477,7 +537,7 @@ export function createForecast(input: { name: string; serviceCategory: string; d
   return { id: Number(result.lastInsertRowid), forecast };
 }
 
-export function listJourneys() { return (db.prepare("SELECT * FROM user_journeys ORDER BY updated_at DESC").all() as Row[]).map((row) => ({ ...row, steps: JSON.parse(String(row.steps_json)) })); }
+export function listJourneys() { return (db.prepare("SELECT * FROM user_journeys ORDER BY updated_at DESC LIMIT 100").all() as Row[]).map((row) => ({ ...row, steps: JSON.parse(String(row.steps_json)) })); }
 export function createJourney(name: string, startUrl: string, steps: string[]) {
   if (!name.trim() || !startUrl.startsWith("http")) throw new Error("Journey name and public start URL are required.");
   if (!steps.length) throw new Error("Add at least one safe navigation step.");
@@ -491,7 +551,7 @@ export function createJourney(name: string, startUrl: string, steps: string[]) {
   return Number(result.lastInsertRowid);
 }
 
-export function listConsentEvaluations() { return db.prepare("SELECT * FROM consent_evaluations ORDER BY created_at DESC").all(); }
+export function listConsentEvaluations() { return db.prepare("SELECT * FROM consent_evaluations ORDER BY created_at DESC LIMIT 100").all(); }
 export function createConsentEvaluation(input: { scanId?: number; acceptSteps: number; rejectSteps: number; rejectVisible: boolean; granular: boolean; revisitAvailable: boolean; defaultSelections: boolean; evaluatorNote?: string }) {
   let result = "Balanced";
   if (!input.rejectVisible) result = "Rejection difficult to locate";
@@ -510,11 +570,13 @@ export function maturityModel(scanId: number) {
   const report = requiredReport(scanId);
   const inventory = serviceInventory().filter((item) => report.services.some((service) => service.domain === item.domain));
   const requirements = evaluateRequirements(scanId);
+  const consentEvaluationCount = listConsentEvaluations().length;
+  const versionCount = listReports().filter((item) => item.target_domain === report.target_domain).length;
   const dimensions = [
     { name: "Service inventory", level: inventory.length === report.services.length ? 2 : 1, evidence: `${inventory.length}/${report.services.length} services inventoried` },
     { name: "Ownership", level: inventory.length && inventory.every((item) => item.owner) ? 3 : inventory.some((item) => item.owner) ? 2 : 1, evidence: `${inventory.filter((item) => item.owner).length}/${inventory.length} services owned` },
-    { name: "Consent governance", level: listConsentEvaluations().length ? 2 : 1, evidence: `${listConsentEvaluations().length} interface evaluations` },
-    { name: "Monitoring", level: listReports().filter((item) => item.target_domain === report.target_domain).length > 1 ? 3 : 1, evidence: `${listReports().filter((item) => item.target_domain === report.target_domain).length} case versions` },
+    { name: "Consent governance", level: consentEvaluationCount ? 2 : 1, evidence: `${consentEvaluationCount} interface evaluations` },
+    { name: "Monitoring", level: versionCount > 1 ? 3 : 1, evidence: `${versionCount} case versions` },
     { name: "Requirement testing", level: requirements.status === "passed" ? 3 : requirements.results.length ? 2 : 1, evidence: `${requirements.results.length} requirements evaluated` },
   ];
   const labels = ["Unmanaged", "Unmanaged", "Documented", "Controlled", "Monitored", "Continuously improved"];

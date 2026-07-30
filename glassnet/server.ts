@@ -1,5 +1,6 @@
 // GlassNet's local application server.
 import "dotenv/config";
+import compression from "compression";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
@@ -40,7 +41,7 @@ import {
   listIssues,
   listJourneys,
   listPortfolios,
-  listReports,
+  listReportSummaries,
   listRequirements,
   listReviews,
   listRules,
@@ -48,6 +49,7 @@ import {
   maturityModel,
   necessityForScan,
   removeWatch,
+  reportView,
   saveFeedback,
   saveServiceGovernance,
   scenariosForScan,
@@ -60,34 +62,77 @@ import {
   updateReview,
 } from "./src/repository.js";
 import { scanPublicWebsite } from "./src/scanner.js";
+import { browserPoolStats, closeBrowserPool } from "./src/browser-pool.js";
 import { safePublicUrl } from "./src/url-safety.js";
 import { register, signIn, signedInUser, signOut } from "./src/auth.js";
 import type { ScanMode } from "./src/types.js";
 
 const app = express();
 const liveJobs = new Map<number, { stage: string; domains: number; requests: number }>();
-const pageHtml = () => fs.readFileSync(config.pageFile, "utf8");
+const pageHtml = fs.readFileSync(config.pageFile, "utf8");
+const sampleFile = path.join(process.cwd(), "tests", "fixtures", "demo-report.json");
+const sampleReport = JSON.parse(fs.readFileSync(sampleFile, "utf8"));
+const maxConcurrentScans = 2;
+const scanQueue: Array<{ scanId: number; website: string; mode: ScanMode }> = [];
+let activeScans = 0;
 const sendError = (response: express.Response, error: unknown, status = 400) => {
   response.status(status).json({ error: error instanceof Error ? error.message : "The request could not be completed." });
 };
 
 app.disable("x-powered-by");
+app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: "20kb" }));
-app.use(express.static(config.staticFolder, { maxAge: "1h" }));
+app.use("/api", (_request, response, next) => {
+  response.setHeader("Cache-Control", "private, no-store");
+  next();
+});
+app.use(express.static(config.staticFolder, { maxAge: "1y", immutable: true, etag: true }));
+
+function startQueuedScans() {
+  while (activeScans < maxConcurrentScans && scanQueue.length) {
+    const next = scanQueue.shift();
+    if (!next) return;
+    activeScans += 1;
+    void runScan(next).finally(() => {
+      activeScans = Math.max(0, activeScans - 1);
+      startQueuedScans();
+    });
+  }
+}
+
+async function runScan(job: { scanId: number; website: string; mode: ScanMode }) {
+  try {
+    updateJob(job.scanId, "capturing", "opening_browser");
+    let lastProgressAt = 0;
+    let lastStage = "";
+    const report = await scanPublicWebsite(job.website, job.mode, (progress) => {
+      const time = Date.now();
+      if (progress.stage !== lastStage || time - lastProgressAt >= 350) {
+        liveJobs.set(job.scanId, progress);
+        lastProgressAt = time;
+        lastStage = progress.stage;
+      }
+    });
+    completeScan(job.scanId, report);
+    liveJobs.set(job.scanId, { stage: "completed", domains: report.services.length + report.first_party.length, requests: report.summary.requests });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The scan could not finish.";
+    failScan(job.scanId, message);
+    liveJobs.set(job.scanId, { stage: "failed", domains: 0, requests: 0 });
+  }
+}
 
 app.get("/api/health", (_request, response) => response.json({ status: "ok", scanner_version: config.scannerVersion }));
 app.get("/api/features", (_request, response) => response.json(featureFlags()));
 app.get("/api/sample-report", (_request, response) => {
-  const file = path.join(process.cwd(), "tests", "fixtures", "demo-report.json");
-  const sample = JSON.parse(fs.readFileSync(file, "utf8"));
   response.json({
-    ...sample,
-    mode: sample.mode || "full",
-    events: sample.events || sample.services.flatMap((service: { domain: string; category: string }, index: number) => [
-      { sequence: index + 1, offset_ms: 280 + (index * 420), type: "response", source: sample.target_domain, destination: service.domain, category: service.category, consent_state: "not_tested" },
+    ...sampleReport,
+    mode: sampleReport.mode || "full",
+    events: sampleReport.events || sampleReport.services.flatMap((service: { domain: string; category: string }, index: number) => [
+      { sequence: index + 1, offset_ms: 280 + (index * 420), type: "response", source: sampleReport.target_domain, destination: service.domain, category: service.category, consent_state: "not_tested" },
     ]),
-    security_headers: sample.security_headers || { "strict-transport-security": "present", "x-content-type-options": "nosniff" },
-    consent: sample.consent || { status: "not_tested", pre_consent_requests: 0, note: "Sample evidence does not include an automated consent action." },
+    security_headers: sampleReport.security_headers || { "strict-transport-security": "present", "x-content-type-options": "nosniff" },
+    consent: sampleReport.consent || { status: "not_tested", pre_consent_requests: 0, note: "Sample evidence does not include an automated consent action." },
     is_sample: true,
   });
 });
@@ -117,39 +162,25 @@ app.post("/api/scans", async (request, response) => {
     const mode = allowedModes.includes(request.body?.mode) ? request.body.mode as ScanMode : "full";
     const created = createScan(website, signedInUser(request.headers.cookie)?.id);
     liveJobs.set(created.scanId, { stage: "queued", domains: 0, requests: 0 });
-    response.status(202).json({ ...created, status: "queued", mode });
-
-    void (async () => {
-      try {
-        updateJob(created.scanId, "capturing", "opening_browser");
-        const report = await scanPublicWebsite(website, mode, (progress) => liveJobs.set(created.scanId, progress));
-        completeScan(created.scanId, report);
-        liveJobs.set(created.scanId, { stage: "completed", domains: report.services.length + report.first_party.length, requests: report.summary.requests });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "The scan could not finish.";
-        failScan(created.scanId, message);
-        liveJobs.set(created.scanId, { stage: "failed", domains: 0, requests: 0 });
-      }
-    })();
+    scanQueue.push({ scanId: created.scanId, website, mode });
+    startQueuedScans();
+    response.status(202).json({ ...created, status: "queued", mode, queue_position: Math.max(0, scanQueue.findIndex((item) => item.scanId === created.scanId)) });
   } catch (error) { sendError(response, error); }
 });
 
-app.get("/api/scans", (_request, response) => {
-  response.json(listReports().map((report) => ({
-    id: report.id,
-    url: report.url,
-    site_name: report.site_name,
-    target_domain: report.target_domain,
-    mode: report.mode || "full",
-    score: report.score,
-    created_at: report.created_at,
-    third_parties: report.summary.third_parties,
-    requests: report.summary.requests,
-    cookies: report.summary.cookies,
-  })));
+app.get("/api/scans", (request, response) => {
+  response.json(listReportSummaries(Number(request.query.limit) || 20, String(request.query.cursor || "")));
 });
 app.get("/api/scans/:id", (request, response) => {
   const report = findReport(Number(request.params.id));
+  if (!report) return response.status(404).json({ error: "Scan not found." });
+  response.json(report);
+});
+app.get("/api/scans/:id/view/:view", (request, response) => {
+  const allowed = ["summary", "map", "journeys", "evidence", "actions"] as const;
+  const view = allowed.find((item) => item === request.params.view);
+  if (!view) return response.status(400).json({ error: "Choose a valid report view." });
+  const report = reportView(Number(request.params.id), view);
   if (!report) return response.status(404).json({ error: "Scan not found." });
   response.json(report);
 });
@@ -157,12 +188,55 @@ app.get("/api/jobs/:id", (request, response) => {
   const job = jobStatus(Number(request.params.id)) as Record<string, unknown> | undefined;
   if (!job) return response.status(404).json({ error: "Scan job not found." });
   const progress = liveJobs.get(Number(job.scan_id));
-  response.json({ ...job, progress, report: job.status === "completed" ? findReport(Number(job.scan_id)) : undefined });
+  response.json({ ...job, progress });
+});
+app.get("/api/jobs/:id/events", (request, response) => {
+  const jobId = Number(request.params.id);
+  response.setHeader("Content-Type", "text/event-stream");
+  response.setHeader("Cache-Control", "private, no-store");
+  response.setHeader("Connection", "keep-alive");
+  response.flushHeaders();
+  let lastPayload = "";
+
+  const send = () => {
+    const job = jobStatus(jobId) as Record<string, unknown> | undefined;
+    if (!job) {
+      response.write(`event: error\ndata: ${JSON.stringify({ error: "Scan job not found." })}\n\n`);
+      response.end();
+      return true;
+    }
+    const progress = liveJobs.get(Number(job.scan_id));
+    const payload = JSON.stringify({ ...job, progress });
+    if (payload !== lastPayload) {
+      response.write(`data: ${payload}\n\n`);
+      lastPayload = payload;
+    }
+    if (job.status === "completed" || job.status === "failed") {
+      response.write(`event: complete\ndata: ${JSON.stringify({ scan_id: job.scan_id, status: job.status, error_code: job.error_code })}\n\n`);
+      response.end();
+      return true;
+    }
+    return false;
+  };
+
+  if (send()) return;
+  const timer = setInterval(() => {
+    if (send()) clearInterval(timer);
+  }, 400);
+  request.on("close", () => clearInterval(timer));
+});
+
+app.get("/api/performance", (_request, response) => {
+  response.json({
+    queue: { active: activeScans, waiting: scanQueue.length, concurrency: maxConcurrentScans },
+    browser: browserPoolStats(),
+    server: { rss_bytes: process.memoryUsage().rss, uptime_seconds: Math.round(process.uptime()) },
+  });
 });
 
 app.get("/api/compare", (request, response) => {
   const ids = String(request.query.id || "").split(",").map(Number).filter(Number.isFinite);
-  const reports = listReports().filter((report) => ids.includes(report.id || -1));
+  const reports = ids.map((id) => findReport(id)).filter((report) => Boolean(report));
   if (ids.length !== 2 || reports.length !== 2) return response.status(400).json({ error: "Choose exactly two scans to compare." });
   response.json(reports);
 });
@@ -361,5 +435,13 @@ app.post("/api/feedback", (request, response) => {
 });
 
 app.use("/api", (_request, response) => response.status(404).json({ error: "API route not found." }));
-app.get(/.*/, (_request, response) => response.type("html").send(pageHtml()));
-app.listen(config.port, () => console.log(`GlassNet is running at http://127.0.0.1:${config.port}`));
+app.get(/.*/, (_request, response) => response.setHeader("Cache-Control", "no-cache").type("html").send(pageHtml));
+const server = app.listen(config.port, () => console.log(`GlassNet is running at http://127.0.0.1:${config.port}`));
+
+async function shutdown() {
+  server.close();
+  await closeBrowserPool();
+}
+
+process.once("SIGINT", () => void shutdown());
+process.once("SIGTERM", () => void shutdown());

@@ -25,6 +25,9 @@ Open `http://127.0.0.1:5000`.
 npm.cmd start
 ```
 
+`npm.cmd start` runs the compiled production server. Use `npm.cmd run dev` only
+while actively editing TypeScript.
+
 ## Archive workspaces
 
 - **Home** — recent cases, archive activity, and quick actions.
@@ -73,6 +76,17 @@ When the scanner did not observe enough evidence, the archive returns
 - `static/css/style.css` — Obsidian Archive visual system.
 - `static/js/app.js` — routes, workspaces, graph, forms, and interactions.
 - `docs/OBSIDIAN_ARCHIVE.md` — rebuild audit and feature map.
+
+The measured performance baseline, results, budgets, and remaining limits are
+documented in `docs/PERFORMANCE.md`.
+
+## Performance
+
+GlassNet reuses the Playwright browser process while creating a fresh isolated
+context for every scan. Scan progress uses one cancellable event stream, case
+tabs request purpose-specific data, graph code loads only on the map route, and
+large evidence lists render in pages. Settings includes optional low-end-device
+and reduced-data modes.
 
 ## Libraries
 
