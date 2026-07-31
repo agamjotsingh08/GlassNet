@@ -271,6 +271,8 @@ p { color: var(--muted); line-height: 1.7; }
 .report-row .metric strong { display: block; margin-bottom: 3px; color: var(--text); font-size: 15px; }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
   padding: 5px 8px;
   border: 1px solid var(--line-bright);
   border-radius: 999px;
@@ -339,14 +341,39 @@ details p { margin: 7px 0 0; font-size: 12px; }
 .check-item .panel-body { padding-top: 8px; }
 .check-item .detail-row { font-size: 13px; }
 .check-item .detail-row strong { max-width: 68%; font-weight: 500; }
+.evidence-row { align-items: flex-start; }
+.evidence-block { width: 68%; min-width: 0; text-align: left; }
+.evidence-preview { display: block; color: var(--text); white-space: normal; overflow-wrap: anywhere; line-height: 1.55; }
+.evidence-details { margin-top: 9px; }
+.evidence-details code {
+  display: block;
+  max-height: 260px;
+  margin-top: 9px;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: #120f12;
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .limitation { margin: 12px 0 0; color: var(--faint); font-size: 12px; }
 
 .table-wrap { width: 100%; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
 th { color: var(--faint); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-td { color: var(--muted); }
+td { color: var(--muted); vertical-align: top; }
 td strong { color: var(--text); }
+.cookie-purpose-cell { min-width: 270px; line-height: 1.45; }
+.cookie-purpose-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.cookie-purpose-text { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+.cookie-details { margin-top: 10px; }
+.cookie-details summary { display: list-item; }
 
 .graph { min-height: 480px; background: #120f12; }
 .graph-note { padding: 10px 14px; color: var(--faint); font-size: 12px; }
@@ -444,6 +471,8 @@ td strong { color: var(--text); }
   .risk-count { text-align: left; }
   .coverage-row { grid-template-columns: repeat(2, 1fr); }
   .finding-top { align-items: flex-start; flex-direction: column; }
+  .evidence-row { flex-direction: column; gap: 8px; }
+  .evidence-block, .evidence-short { width: 100%; max-width: none !important; text-align: left !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -49,7 +49,14 @@ test("security checklist covers transport, redirects, frames, permissions, forms
   for (const id of ["HTTPS", "MIXED_CONTENT", "REDIRECTS", "IFRAMES", "PERMISSIONS", "FORMS", "DOWNLOADS", "OBFUSCATION", "MINING"]) {
     assert.ok(result.security_checks.some((item) => item.id === id));
   }
-  assert.ok(result.security_checks.some((item) => item.id === "HEADER_CONTENT_SECURITY_POLICY" && item.status === "Not observed"));
+  assert.ok(result.security_checks.some((item) => item.id === "HEADER_CONTENT_SECURITY_POLICY" && item.status === "Needs review"));
+});
+
+test("completed checks use passed or review states instead of not observed", () => {
+  const result = analyzeReport(report({ security_headers: {} }));
+  assert.ok(!result.security_checks.some((item) => item.status === "Not observed"));
+  assert.ok(result.security_checks.some((item) => item.id === "FORMS" && item.status === "Passed"));
+  assert.ok(result.security_checks.some((item) => item.id === "COOKIE_SECURITY" && item.status === "Passed"));
 });
 
 test("minified code alone is excluded from the obfuscation rule", () => {

@@ -66,8 +66,11 @@ scan duration, browser profile, region, and interaction state.
 ## Cookie purposes
 
 Cookie values are discarded. Cookie names are checked against a small reviewed
-knowledge list first, then conservative exact-name patterns, and finally an
-Unknown fallback. Purpose confidence is displayed as Known, Likely, or Unknown.
+knowledge list first, then conservative exact-name patterns, and finally the
+cookie's first-party, third-party, session, and security context. Every named
+cookie receives a cautious contextual explanation. Unknown is reserved for a
+cookie whose name or domain was unavailable. Purpose confidence is displayed as
+Known, Likely, or Unknown.
 
 The reviewed list is versioned and currently references official Google
 Analytics and Cloudflare documentation. A name match is an explanation aid,

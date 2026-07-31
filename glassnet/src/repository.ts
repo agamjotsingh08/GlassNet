@@ -12,7 +12,6 @@ export function normalizeReport(value: Record<string, unknown>): ScanResult {
   const raw = value as unknown as ScanResult;
   const finalUrl = raw.final_url || raw.url;
   const cookies = (raw.cookies || []).map((cookie) => {
-    if (cookie.name && cookie.purpose) return cookie;
     const basic = {
       name: cookie.name || "Not recorded in this older report",
       domain: cookie.domain,
@@ -24,6 +23,7 @@ export function normalizeReport(value: Record<string, unknown>): ScanResult {
       firstParty: cookie.firstParty,
     };
     return {
+      ...cookie,
       ...basic,
       expires_at: cookie.expires_at || null,
       consent_state: "Not tested" as const,
@@ -47,9 +47,10 @@ export function normalizeReport(value: Record<string, unknown>): ScanResult {
       checks_completed: 0, checks_unavailable: 1,
     },
   };
-  const analysis = raw.risk && raw.findings && raw.security_checks
-    ? { risk: raw.risk, findings: raw.findings, security_checks: raw.security_checks }
-    : analyzeReport(base);
+  // Re-run the current evidence rules when an older report is opened. The raw
+  // observations stay unchanged, but clearer labels and classifier fixes also
+  // appear in scan history instead of only affecting new scans.
+  const analysis = analyzeReport(base);
   return { ...base, ...analysis };
 }
 
