@@ -12,11 +12,15 @@ security audit.
 ## Main features
 
 - Quick and full website scans
+- Evidence-based observed-risk summary with four careful result levels
 - Public URL validation
 - First-party and third-party domain detection
 - Known-service classification
 - Privacy exposure score with a plain-language label
-- Safe cookie metadata, without cookie values
+- Cookie names, likely purposes, confidence, and security attributes
+- Security checklist covering transport, headers, redirects, forms, frames,
+  permissions, downloads, and conservative script signals
+- Paginated request explorer with server-side filtering and sorting
 - Storage-key names and external script URLs in full scans
 - Selected response security headers
 - Interactive website dependency map
@@ -39,6 +43,42 @@ GlassNet does not collect or save:
 - Response bodies
 - Personal browser sessions
 - Private or local network targets
+
+Request URLs are redacted before they enter a report. Query parameter names can
+remain visible, but every query value is replaced with `[redacted]`. Credential
+headers, request bodies, response bodies, and form values are never captured.
+
+## Observed risk
+
+GlassNet uses a small versioned ruleset instead of producing a hidden risk
+score. A report can show only:
+
+- Low observed risk
+- Some concerns found
+- High observed risk
+- Unable to determine
+
+Each concern includes its required evidence, severity, confidence, limitation,
+remediation, and a short “What does this mean?” explanation. GlassNet never
+claims that a website is completely safe. The result covers only one page,
+scan duration, browser profile, region, and interaction state.
+
+## Cookie purposes
+
+Cookie values are discarded. Cookie names are checked against a small reviewed
+knowledge list first, then conservative exact-name patterns, and finally an
+Unknown fallback. Purpose confidence is displayed as Known, Likely, or Unknown.
+
+The reviewed list is versioned and currently references official Google
+Analytics and Cloudflare documentation. A name match is an explanation aid,
+not proof of how a particular website uses the cookie.
+
+## Request explorer
+
+Individual requests are bounded by the scan limit and kept inside the local
+report. The browser requests one page of rows at a time from the server. Search,
+party, type, category, status, consent state, known/unknown status, minimum
+size, sorting, and pagination are processed before rows are returned.
 
 Completed reports are stored in `data/glassnet.sqlite`. The `data` directory is
 ignored by Git, so local scan history is not included when the repository is
@@ -124,10 +164,13 @@ glassnet/
 ├── server.ts                 Express server and scan queue
 ├── src/
 │   ├── browser-pool.ts       Reuses the browser process safely
+│   ├── analysis.ts           Versioned risk rules and security checks
 │   ├── classification.ts     Recognizes known external services
+│   ├── cookie-knowledge.ts   Reviewed and conservative cookie purposes
 │   ├── config.ts             Reads local environment settings
 │   ├── database.ts           Creates the local SQLite tables
 │   ├── repository.ts         Saves and retrieves scan reports
+│   ├── request-explorer.ts   URL redaction and paginated request filters
 │   ├── scanner.ts            Observes a public webpage
 │   ├── types.ts              Shared TypeScript data shapes
 │   └── url-safety.ts         Blocks unsafe scan targets

@@ -25,3 +25,16 @@ test("live scans use one cancellable event stream instead of rapid polling", () 
   assert.match(application, /new EventSource/);
   assert.doesNotMatch(application, /setTimeout\(\(\) => pollJob\(jobId\), 700\)/);
 });
+
+test("request explorer cancels stale searches and uses debounced server pages", () => {
+  const application = fs.readFileSync(projectFile("static/js/app.js"), "utf8");
+  assert.match(application, /requestController\.abort\(\)/);
+  assert.match(application, /setTimeout\(\(\) => loadRequests\(report, 1\), 250\)/);
+  assert.match(application, /\/api\/scans\/\$\{report\.id\}\/requests/);
+});
+
+test("scanner never reads a cookie value into the report", () => {
+  const scanner = fs.readFileSync(projectFile("src/scanner.ts"), "utf8");
+  assert.doesNotMatch(scanner, /cookie\.value/);
+  assert.doesNotMatch(scanner, /request\.postData/);
+});

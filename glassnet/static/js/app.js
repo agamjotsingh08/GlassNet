@@ -4,6 +4,8 @@ const main = document.querySelector("#main-content");
 const toast = document.querySelector("#toast");
 let activeEventSource;
 let currentReport;
+let requestController;
+let requestTimer;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -294,10 +296,8 @@ function renderReport(report, selectedTab = "summary") {
         <article class="panel stat"><strong>${Number(report.summary.cookies)}</strong><span>cookies observed</span></article>
       </div>
 
-      <div class="notice">${escapeHtml(report.notice)}</div>
-
       <div class="tabs" role="tablist">
-        ${["summary", "map", "evidence"].map((tab) => `
+        ${["summary", "requests", "cookies", "security", "map"].map((tab) => `
           <button class="${selectedTab === tab ? "active" : ""}" data-report-tab="${tab}" type="button">${titleCase(tab)}</button>
         `).join("")}
       </div>
@@ -310,14 +310,59 @@ function renderReport(report, selectedTab = "summary") {
   });
 
   if (selectedTab === "map") renderMap(report);
-  else if (selectedTab === "evidence") renderEvidence(report);
+  else if (selectedTab === "requests") renderRequests(report);
+  else if (selectedTab === "cookies") renderCookies(report);
+  else if (selectedTab === "security") renderSecurity(report);
   else renderSummary(report);
 }
 
 function renderSummary(report) {
   const content = document.querySelector("#report-content");
+  const risk = report.risk || { level: "Unable to determine", summary: "This older report does not contain enough evidence for the new risk rules.", reasons: [], concern_count: 0, limitations: report.limitations || [] };
+  const findings = report.findings || [];
   content.innerHTML = `
-    <section class="panel">
+    <section class="risk-summary ${risk.level === "Low observed risk" ? "risk-low" : risk.level === "High observed risk" ? "risk-high" : risk.level === "Some concerns found" ? "risk-some" : "risk-unknown"}">
+      <div>
+        <p class="eyebrow">Observed risk</p>
+        <h2>${escapeHtml(risk.level)}</h2>
+        <p>${escapeHtml(risk.summary)}</p>
+        ${risk.reasons?.length ? `<ul class="risk-reasons">${risk.reasons.slice(0, 4).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>` : ""}
+        <a class="evidence-link" href="#findings">View supporting evidence</a>
+      </div>
+      <div class="risk-count"><strong>${Number(risk.concern_count)}</strong><span>observed concerns</span></div>
+    </section>
+
+    <section class="panel" id="findings">
+      <div class="panel-head">
+        <div><h3>Main concerns</h3><p>Every conclusion below is connected to scan evidence.</p></div>
+        <span class="badge">Rules ${escapeHtml(risk.ruleset_version || "legacy")}</span>
+      </div>
+      <div class="finding-list">
+        ${findings.length ? findings.map((finding) => `
+          <article class="finding-item">
+            <div class="finding-top"><strong>${escapeHtml(finding.title)}</strong><span class="badge ${finding.severity === "serious" || finding.severity === "high" ? "bad" : "warn"}">${escapeHtml(finding.severity)} · ${escapeHtml(finding.confidence)} confidence</span></div>
+            <p>${escapeHtml(finding.explanation)}</p>
+            <p class="evidence-line"><b>Evidence:</b> ${escapeHtml(finding.evidence)}</p>
+            <div class="meaning"><b>What does this mean?</b><span>${escapeHtml(finding.beginner_explanation)}</span></div>
+          </article>
+        `).join("") : `<div class="panel-body"><p>No evidence-based risk rule matched this scan.</p><div class="meaning"><b>What does this mean?</b><span>No major concern was observed during this short visit, but that does not guarantee the website is completely safe.</span></div></div>`}
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
+      <div class="panel-head"><h3>Scan coverage</h3><span class="badge">One page load</span></div>
+      <div class="coverage-row">
+        <span><b>${report.coverage?.page_loaded ? "Yes" : "No"}</b>Page loaded</span>
+        <span><b>${Math.round(Number(report.coverage?.duration_ms || 0) / 100) / 10}s</b>Duration</span>
+        <span><b>${Number(report.summary.requests)}</b>Requests</span>
+        <span><b>${Number(report.summary.cookies)}</b>Cookies</span>
+        <span><b>${Number(report.coverage?.redirects_followed || 0)}</b>Redirects</span>
+        <span><b>${Number(report.coverage?.checks_completed || 0)}</b>Checks completed</span>
+      </div>
+      <div class="panel-body"><p class="muted">${(risk.limitations || report.limitations || []).map(escapeHtml).join(" ")}</p></div>
+    </section>
+
+    <section class="panel" style="margin-top:14px">
       <div class="panel-head">
         <div><h3>External services</h3><p>Classification is based on known domains and observable request types.</p></div>
         <span class="badge">${report.services.length} found</span>
@@ -338,16 +383,116 @@ function renderSummary(report) {
         </table>
       </div>
     </section>
+  `;
+}
 
+function renderRequests(report) {
+  const content = document.querySelector("#report-content");
+  content.innerHTML = `
+    <section class="panel">
+      <div class="panel-head"><div><h3>Request explorer</h3><p>URLs are redacted before storage. Query values, headers, and bodies are never shown.</p></div><span class="badge" id="request-total">Loading</span></div>
+      <form class="filter-bar" id="request-filters">
+        <input class="field" name="search" placeholder="Search domain or safe URL">
+        <select class="field" name="party"><option value="">Any party</option><option>First party</option><option>Third party</option></select>
+        <select class="field" name="type"><option value="">Any type</option><option value="document">Document</option><option value="script">Script</option><option value="image">Image</option><option value="stylesheet">Style</option><option value="font">Font</option><option value="fetch">Fetch</option><option value="xhr">XHR</option><option value="websocket">WebSocket</option></select>
+        <select class="field" name="category"><option value="">Any category</option>${["Documents","Scripts","Images","Styles","Fonts","APIs","Analytics","Advertising","Authentication","Payments","Social media","Embeds","WebSockets","Other","Unknown"].map((item) => `<option>${item}</option>`).join("")}</select>
+        <select class="field" name="known"><option value="">Known or unknown</option><option value="known">Known</option><option value="unknown">Unknown</option></select>
+        <input class="field" name="status" type="number" min="0" max="599" placeholder="Status code" aria-label="Response status code">
+        <select class="field" name="consent"><option value="">Any consent state</option><option>Not tested</option></select>
+        <input class="field" name="min_bytes" type="number" min="0" value="0" aria-label="Minimum transferred bytes">
+        <select class="field" name="sort"><option value="timestamp_ms">Sort by time</option><option value="domain">Sort by domain</option><option value="status">Sort by status</option><option value="transferred_bytes">Sort by size</option></select>
+      </form>
+      <div id="request-results"><div class="panel-body"><p>Loading captured requests…</p></div></div>
+      <div class="pager" id="request-pager"></div>
+    </section>
+  `;
+  const form = document.querySelector("#request-filters");
+  form.addEventListener("input", () => {
+    clearTimeout(requestTimer);
+    requestTimer = setTimeout(() => loadRequests(report, 1), 250);
+  });
+  loadRequests(report, 1);
+}
+
+async function loadRequests(report, page) {
+  const form = document.querySelector("#request-filters");
+  if (!form) return;
+  if (requestController) requestController.abort();
+  requestController = new AbortController();
+  const params = new URLSearchParams(new FormData(form));
+  params.set("page", String(page));
+  params.set("page_size", "25");
+  try {
+    let data;
+    if (report.is_sample) {
+      const items = report.requests || [];
+      data = { items, total: items.length, page: 1, pages: 1 };
+    } else {
+      data = await api(`/api/scans/${report.id}/requests?${params}`, { signal: requestController.signal });
+    }
+    document.querySelector("#request-total").textContent = `${data.total} requests`;
+    document.querySelector("#request-results").innerHTML = data.items.length ? `
+      <div class="table-wrap"><table><thead><tr><th>Destination</th><th>Type</th><th>Status</th><th>Size</th><th>Time</th></tr></thead><tbody>
+        ${data.items.map((item) => `<tr class="request-row" tabindex="0" data-request-id="${item.id}"><td><strong>${escapeHtml(item.domain)}</strong><br><span class="mono">${escapeHtml(item.url)}</span></td><td>${escapeHtml(item.category)}<br><span class="muted">${escapeHtml(item.party)}</span></td><td>${item.status || "Failed"}</td><td>${item.transferred_bytes ? `${item.transferred_bytes.toLocaleString()} B` : "Unknown"}</td><td>+${Number(item.timestamp_ms)}ms</td></tr><tr class="request-detail hidden" data-detail-for="${item.id}"><td colspan="5"><div class="detail-list"><div class="detail-row"><span>Method</span><strong>${escapeHtml(item.method)}</strong></div><div class="detail-row"><span>Initiator</span><strong class="mono">${escapeHtml(item.initiator)}</strong></div><div class="detail-row"><span>Redirected from</span><strong class="mono">${escapeHtml(item.redirect_from || "No observed request redirect")}</strong></div><div class="detail-row"><span>Classification</span><strong>${escapeHtml(item.category)} · ${escapeHtml(item.confidence)} · ${escapeHtml(item.classification_method)}</strong></div><div class="detail-row"><span>Associated cookie names</span><strong>${escapeHtml((report.cookies || []).filter((cookie) => cookie.domain === item.domain).map((cookie) => cookie.name).join(", ") || "None observed")}</strong></div><div class="detail-row"><span>Related finding</span><strong>${escapeHtml((report.findings || []).filter((finding) => finding.category === "Third parties" && item.resource_type === "script").map((finding) => finding.title).join(", ") || "No direct finding")}</strong></div><div class="detail-row"><span>Consent state</span><strong>${escapeHtml(item.consent_state)}</strong></div><div class="meaning"><b>What does this mean?</b><span>The page contacted ${escapeHtml(item.domain)} for a ${escapeHtml(item.resource_type)} resource. The URL is redacted and transferred size may rely on the server's declared content length.</span></div></div></td></tr>`).join("")}
+      </tbody></table></div>` : `<div class="panel-body"><p>No requests match these filters.</p></div>`;
+    document.querySelectorAll(".request-row").forEach((row) => {
+      const toggle = () => document.querySelector(`[data-detail-for="${row.dataset.requestId}"]`)?.classList.toggle("hidden");
+      row.addEventListener("click", toggle);
+      row.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") toggle(); });
+    });
+    document.querySelector("#request-pager").innerHTML = `<button class="button small secondary" ${data.page <= 1 ? "disabled" : ""} data-request-page="${data.page - 1}">Previous</button><span>Page ${data.page} of ${data.pages}</span><button class="button small secondary" ${data.page >= data.pages ? "disabled" : ""} data-request-page="${data.page + 1}">Next</button>`;
+    document.querySelectorAll("[data-request-page]").forEach((button) => button.addEventListener("click", () => loadRequests(report, Number(button.dataset.requestPage))));
+  } catch (error) {
+    if (error.name !== "AbortError") document.querySelector("#request-results").innerHTML = `<div class="panel-body"><p>${escapeHtml(error.message)}</p></div>`;
+  }
+}
+
+function renderCookies(report) {
+  const content = document.querySelector("#report-content");
+  content.innerHTML = `
+    <section class="panel">
+      <div class="panel-head"><div><h3>Cookie names and purposes</h3><p>Names and attributes are shown; cookie values are never collected.</p></div><span class="badge">${report.cookies.length} cookies</span></div>
+      <form class="filter-bar cookie-filters" id="cookie-filters">
+        <input class="field" name="search" placeholder="Search name or domain">
+        <select class="field" name="purpose"><option value="">Any purpose confidence</option><option>Known</option><option>Likely</option><option>Unknown</option></select>
+        <select class="field" name="party"><option value="">Any party</option><option value="first">First party</option><option value="third">Third party</option></select>
+        <select class="field" name="security"><option value="">Any security state</option><option value="concern">Has concern</option><option value="clear">No contextual concern</option></select>
+        <select class="field" name="consent"><option value="">Any consent state</option><option>Not tested</option></select>
+        <select class="field" name="sort"><option value="name">Sort by name</option><option value="domain">Sort by domain</option><option value="purpose">Sort by purpose</option></select>
+      </form>
+      <div id="cookie-results"></div>
+    </section>
+  `;
+  const form = document.querySelector("#cookie-filters");
+  const update = () => {
+    const values = Object.fromEntries(new FormData(form));
+    const search = String(values.search || "").toLowerCase();
+    const rows = [...report.cookies].filter((cookie) => {
+      if (search && !`${cookie.name} ${cookie.domain}`.toLowerCase().includes(search)) return false;
+      if (values.purpose && cookie.purpose_confidence !== values.purpose) return false;
+      if (values.party === "first" && !cookie.firstParty) return false;
+      if (values.party === "third" && cookie.firstParty) return false;
+      if (values.security === "concern" && !cookie.security_notes.length) return false;
+      if (values.security === "clear" && cookie.security_notes.length) return false;
+      if (values.consent && cookie.consent_state !== values.consent) return false;
+      return true;
+    }).sort((a, b) => String(values.sort === "domain" ? a.domain : values.sort === "purpose" ? a.purpose_category : a.name).localeCompare(String(values.sort === "domain" ? b.domain : values.sort === "purpose" ? b.purpose_category : b.name)));
+    document.querySelector("#cookie-results").innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>Cookie</th><th>Purpose</th><th>Party</th><th>Security</th><th>Lifetime</th></tr></thead><tbody>${rows.map((cookie) => `<tr><td><strong class="mono">${escapeHtml(cookie.name)}</strong><br>${escapeHtml(cookie.domain)}<br><span class="muted">Path ${escapeHtml(cookie.path)}</span></td><td><span class="badge">${escapeHtml(cookie.purpose_confidence)}</span><br>${escapeHtml(cookie.purpose)}<details><summary>Classification details</summary><p>${escapeHtml(cookie.classification_source)}</p><p>Category: ${escapeHtml(cookie.purpose_category)}</p><p><b>What does this mean?</b> ${escapeHtml(cookie.purpose)}</p></details></td><td>${cookie.firstParty ? "First" : "Third"}</td><td>${cookie.secure ? "Secure" : "Not Secure"}<br>${cookie.httpOnly ? "HttpOnly" : "Readable by scripts"}<br>SameSite ${escapeHtml(cookie.sameSite)}${cookie.security_notes.length ? `<p class="cookie-warning">${cookie.security_notes.map(escapeHtml).join(" ")}</p>` : ""}</td><td>${cookie.session ? "Session" : escapeHtml(formatDate(cookie.expires_at))}<br><span class="muted">${cookie.session ? "No fixed expiry" : `Expires ${escapeHtml(cookie.expires_at)}`}<br>Consent: ${escapeHtml(cookie.consent_state)}</span></td></tr>`).join("")}</tbody></table></div>` : `<div class="panel-body"><p>No cookies match these filters.</p></div>`;
+  };
+  form.addEventListener("input", update);
+  update();
+}
+
+function renderSecurity(report) {
+  const content = document.querySelector("#report-content");
+  const checks = report.security_checks || [];
+  content.innerHTML = `
+    <div class="check-list">
+      ${checks.map((item) => `<article class="panel check-item"><div class="panel-head"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.observation)}</p></div><span class="badge ${item.status === "Passed" ? "good" : item.status === "Concern" ? "bad" : item.status === "Needs review" ? "warn" : ""}">${escapeHtml(item.status)}</span></div><div class="panel-body"><div class="detail-row"><span>Why it matters</span><strong>${escapeHtml(item.why_it_matters)}</strong></div><div class="detail-row"><span>Evidence</span><strong class="mono">${escapeHtml(item.evidence)}</strong></div><div class="detail-row"><span>Confidence</span><strong>${escapeHtml(item.confidence)}</strong></div><div class="meaning"><b>What does this mean?</b><span>${escapeHtml(item.beginner_explanation)}</span></div><p class="limitation"><b>Limitation:</b> ${escapeHtml(item.limitation)}</p></div></article>`).join("") || `<div class="empty"><h3>Checklist unavailable</h3><p>This older report does not contain the observations needed for the checklist.</p></div>`}
+    </div>
     <div class="grid two" style="margin-top:14px">
-      <section class="panel">
-        <div class="panel-head"><h3>What the score means</h3></div>
-        <div class="panel-body"><p>${escapeHtml(report.notice)}</p><p>The score is a transparent estimate based on observed services and cookie metadata. It is not a legal or security verdict.</p></div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><h3>Limits of this report</h3></div>
-        <div class="panel-body"><ul class="muted">${report.limitations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
-      </section>
+      <section class="panel"><div class="panel-head"><h3>Observed forms</h3><span class="badge">${(report.forms || []).length}</span></div><div class="panel-body detail-list">${(report.forms || []).length ? report.forms.map((form) => `<div class="detail-row"><span>${escapeHtml(form.method)} · ${form.third_party ? "Third party" : "First party"}${form.action_missing ? " · action omitted" : ""}<br><small>Sensitive types: ${escapeHtml(form.sensitive_fields.join(", ") || "none")} · autocomplete: ${escapeHtml(form.autocomplete.join(", ") || "not declared")}</small></span><strong class="mono">${escapeHtml(form.action)}</strong></div>`).join("") : `<p>No forms were observed.</p>`}</div></section>
+      <section class="panel"><div class="panel-head"><h3>Frames and permissions</h3><span class="badge">${(report.iframes || []).length} frames</span></div><div class="panel-body detail-list">${(report.iframes || []).map((frame) => `<div class="detail-row"><span>${frame.hidden ? "Hidden" : "Visible"} · ${frame.third_party ? "Third party" : "First party"}<br><small>Sandbox: ${escapeHtml(frame.sandbox || "not declared")}</small></span><strong class="mono">${escapeHtml(frame.url)}</strong></div>`).join("") || `<p>No frames were observed.</p>`}${(report.permissions || []).filter((item) => item.requested || item.policy_declared).map((item) => `<div class="detail-row"><span>${escapeHtml(item.name)}</span><strong>${item.requested ? "Requested; not granted" : "Mentioned by policy only"}</strong></div>`).join("")}</div></section>
     </div>
   `;
 }
@@ -390,56 +535,6 @@ async function renderMap(report) {
   } catch (error) {
     document.querySelector("#case-graph").innerHTML = `<div class="empty"><h3>Map unavailable</h3><p>${escapeHtml(error.message)}</p></div>`;
   }
-}
-
-function renderEvidence(report) {
-  const content = document.querySelector("#report-content");
-  const headerRows = Object.entries(report.security_headers || {});
-
-  content.innerHTML = `
-    <div class="grid two">
-      <section class="panel">
-        <div class="panel-head"><h3>Cookie metadata</h3><span class="badge">${report.cookies.length}</span></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Domain</th><th>Secure</th><th>HttpOnly</th><th>Party</th></tr></thead>
-            <tbody>
-              ${report.cookies.length ? report.cookies.map((cookie) => `
-                <tr><td class="mono">${escapeHtml(cookie.domain)}</td><td>${cookie.secure ? "Yes" : "No"}</td><td>${cookie.httpOnly ? "Yes" : "No"}</td><td>${cookie.firstParty ? "First" : "Third"}</td></tr>
-              `).join("") : `<tr><td colspan="4">No cookie metadata was observed.</td></tr>`}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head"><h3>Security headers</h3><span class="badge">${headerRows.length}</span></div>
-        <div class="panel-body detail-list">
-          ${headerRows.length ? headerRows.map(([name, value]) => `
-            <div class="detail-row"><span class="mono">${escapeHtml(name)}</span><strong>${escapeHtml(value)}</strong></div>
-          `).join("") : `<p>No selected security header was captured.</p>`}
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head"><h3>Storage keys</h3><span class="badge">${report.storage.length}</span></div>
-        <div class="panel-body detail-list">
-          ${report.storage.length ? report.storage.map((item) => `
-            <div class="detail-row"><span>${escapeHtml(item.type)}</span><strong class="mono">${escapeHtml(item.key)}</strong></div>
-          `).join("") : `<p>No storage-key names were observed.</p>`}
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head"><h3>External scripts</h3><span class="badge">${report.scripts.length}</span></div>
-        <div class="panel-body detail-list">
-          ${report.scripts.length ? report.scripts.map((script) => `
-            <div class="detail-row"><span class="mono">${escapeHtml(script)}</span></div>
-          `).join("") : `<p>No external script URLs were recorded.</p>`}
-        </div>
-      </section>
-    </div>
-  `;
 }
 
 async function renderCompare() {

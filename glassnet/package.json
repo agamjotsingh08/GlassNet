@@ -1,6 +1,6 @@
 {
   "name": "glassnet",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "prepare": "npm run build",
@@ -9,7 +9,7 @@
     "dev": "tsx watch server.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --outDir dist",
-    "test": "npm run build && node --test dist/tests/classification.test.js dist/tests/performance-budget.test.js",
+    "test": "npm run build && node --test dist/tests/classification.test.js dist/tests/analysis.test.js dist/tests/cookie-analysis.test.js dist/tests/request-explorer.test.js dist/tests/performance-budget.test.js",
     "check-secrets": "node scripts/secret-check.mjs",
     "install-browser": "playwright install chromium"
   },

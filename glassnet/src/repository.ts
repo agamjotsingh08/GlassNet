@@ -1,10 +1,57 @@
 // Small database helpers for scan history.
 import { mainDomain } from "./classification.js";
+import { analyzeReport } from "./analysis.js";
+import { classifyCookie, cookieSecurityNotes } from "./cookie-knowledge.js";
 import { db } from "./database.js";
 import type { ScanResult } from "./types.js";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
+
+export function normalizeReport(value: Record<string, unknown>): ScanResult {
+  const raw = value as unknown as ScanResult;
+  const finalUrl = raw.final_url || raw.url;
+  const cookies = (raw.cookies || []).map((cookie) => {
+    if (cookie.name && cookie.purpose) return cookie;
+    const basic = {
+      name: cookie.name || "Not recorded in this older report",
+      domain: cookie.domain,
+      path: cookie.path || "/",
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite,
+      session: cookie.session,
+      firstParty: cookie.firstParty,
+    };
+    return {
+      ...basic,
+      expires_at: cookie.expires_at || null,
+      consent_state: "Not tested" as const,
+      ...classifyCookie(basic),
+      security_notes: cookieSecurityNotes(basic, finalUrl.startsWith("https://")),
+    };
+  });
+  const base: Omit<ScanResult, "findings" | "security_checks" | "risk"> = {
+    ...raw,
+    cookies,
+    requests: raw.requests || [],
+    final_url: finalUrl,
+    redirect_chain: raw.redirect_chain || [],
+    iframes: raw.iframes || [],
+    forms: raw.forms || [],
+    permissions: raw.permissions || [],
+    downloads: raw.downloads || [],
+    script_signals: raw.script_signals || { suspicious_obfuscation: 0, miner_signature: false, details: [] },
+    coverage: raw.coverage || {
+      page_loaded: Boolean(raw.url), duration_ms: 0, redirects_followed: 0,
+      checks_completed: 0, checks_unavailable: 1,
+    },
+  };
+  const analysis = raw.risk && raw.findings && raw.security_checks
+    ? { risk: raw.risk, findings: raw.findings, security_checks: raw.security_checks }
+    : analyzeReport(base);
+  return { ...base, ...analysis };
+}
 
 function findOrCreateWebsite(url: string, title?: string): number {
   const parsed = new URL(url);
@@ -28,7 +75,7 @@ export function createScan(url: string): { scanId: number; jobId: number } {
 
   const scan = db.prepare(`
     INSERT INTO scans (website_id, status, scanner_version, created_at)
-    VALUES (?, 'created', '0.6.0-local', ?)
+    VALUES (?, 'created', '0.7.0-local', ?)
   `).run(websiteId, time);
   const scanId = Number(scan.lastInsertRowid);
 
@@ -140,11 +187,11 @@ export function findReport(id: number): ScanResult | undefined {
   `).get(id) as Row | undefined;
 
   if (!row?.report_json) return undefined;
-  return {
+  return normalizeReport({
     ...JSON.parse(String(row.report_json)),
     id: Number(row.id),
     created_at: String(row.created_at),
-  };
+  });
 }
 
 export function jobStatus(jobId: number) {

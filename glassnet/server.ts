@@ -14,8 +14,10 @@ import {
   findReport,
   jobStatus,
   listReportSummaries,
+  normalizeReport,
   updateJob,
 } from "./src/repository.js";
+import { filterRequests } from "./src/request-explorer.js";
 import { scanPublicWebsite } from "./src/scanner.js";
 import type { ScanMode } from "./src/types.js";
 import { safePublicUrl } from "./src/url-safety.js";
@@ -93,7 +95,7 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.get("/api/sample-report", (_request, response) => {
-  response.json({ ...sampleReport, is_sample: true });
+  response.json({ ...normalizeReport(sampleReport), is_sample: true });
 });
 
 app.post("/api/scans", async (request, response) => {
@@ -121,10 +123,17 @@ app.get("/api/scans", (request, response) => {
   response.json(listReportSummaries(Number(request.query.limit) || 20, String(request.query.cursor || "")));
 });
 
+app.get("/api/scans/:id/requests", (request, response) => {
+  const report = findReport(Number(request.params.id));
+  if (!report) return response.status(404).json({ error: "Scan not found." });
+  response.json(filterRequests(report.requests, request.query));
+});
+
 app.get("/api/scans/:id", (request, response) => {
   const report = findReport(Number(request.params.id));
   if (!report) return response.status(404).json({ error: "Scan not found." });
-  response.json(report);
+  const { requests: _requests, ...overview } = report;
+  response.json(overview);
 });
 
 app.get("/api/jobs/:id", (request, response) => {
